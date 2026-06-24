@@ -1,5 +1,7 @@
 import { useRef, useState, useCallback } from "react";
 import { CameraView } from "expo-camera";
+import * as Haptics from "expo-haptics";
+import * as Speech from "expo-speech";
 
 // Config
 const PC_IP = "localhost";
@@ -13,6 +15,7 @@ interface Stats {
   latency: number | null;
   fps: number;
   frameCount: number;
+  hazard: string | null;
 }
 
 export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
@@ -26,6 +29,7 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
     latency: null,
     fps: 0,
     frameCount: 0,
+    hazard: null,
   });
 
   const startCapture = useCallback(() => {
@@ -81,9 +85,25 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
       setStats((s) => ({ ...s, status: "Connection error" }));
     };
 
-    ws.onmessage = () => {
+    ws.onmessage = (event) => {
       const rtt = Date.now() - lastSentAtRef.current;
-      setStats((s) => ({ ...s, latency: rtt }));
+      const msg = JSON.parse(event.data as string);
+
+      const top = msg.detections?.[0] ?? null;
+      const hazard = top ? `${top.tier} — ${top.label} (${(top.area_ratio * 100).toFixed(0)}%)` : null;
+      setStats((s) => ({ ...s, latency: rtt, hazard }));
+
+      for (const cmd of msg.commands ?? []) {
+        if (cmd.action === "vibrate") {
+          const style =
+            cmd.intensity === "high"   ? Haptics.ImpactFeedbackStyle.Heavy :
+            cmd.intensity === "medium" ? Haptics.ImpactFeedbackStyle.Medium :
+                                         Haptics.ImpactFeedbackStyle.Light;
+          Haptics.impactAsync(style);
+        } else if (cmd.action === "speak") {
+          Speech.speak(cmd.text, { rate: 1.1, language: "en" });
+        }
+      }
     };
   }, [startCapture]);
 

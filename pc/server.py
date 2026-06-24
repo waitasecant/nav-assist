@@ -1,3 +1,5 @@
+"""FastAPI WebSocket server: receives camera frames, runs YOLO inference, sends haptic/TTS commands back to the phone."""
+
 import asyncio
 import time
 import base64
@@ -5,6 +7,7 @@ import json
 import uvicorn
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from model.inference import YOLOInference
+from utils import build_commands
 
 MODEL_PATH = "model/yolov8n.onnx"
 
@@ -22,6 +25,7 @@ async def websocket_endpoint(ws: WebSocket):
     frame_count = 0
     start = time.time()
     loop = asyncio.get_running_loop()
+    last_spoken: dict = {"tier": None, "label": None, "at": 0.0}
 
     try:
         while True:
@@ -36,6 +40,7 @@ async def websocket_endpoint(ws: WebSocket):
 
             # Run blocking ONNX inference in thread pool — keeps event loop free
             detections = await loop.run_in_executor(None, model.run, frame_bytes)
+            commands = build_commands(detections, last_spoken)
 
             if detections:
                 top = detections[0]
@@ -59,6 +64,7 @@ async def websocket_endpoint(ws: WebSocket):
                     "frame_count": frame_count,
                     "server_fps": round(fps, 2),
                     "detections": detections,
+                    "commands": commands,
                 }
             )
 

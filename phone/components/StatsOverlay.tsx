@@ -7,17 +7,19 @@ interface Props {
   latency: number | null;
   fps: number;
   frameCount: number;
+  hazard: string | null;
 }
 
-export function StatsOverlay({ status, latency, fps, frameCount }: Props) {
+export function StatsOverlay({ status, latency, fps, frameCount, hazard }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>NavAssist — Phase 1</Text>
+      <Text style={styles.title}>NavAssist</Text>
       <StatRow label="Server" value={`${PC_IP}:${WS_PORT}`} />
       <StatRow label="Status" value={status} />
       <StatRow label="RTT Latency" value={latency != null ? `${latency} ms` : "—"} />
       <StatRow label="FPS" value={String(fps)} />
       <StatRow label="Total Frames" value={String(frameCount)} />
+      <StatRow label="Hazard" value={hazard ?? "Clear"} />
     </View>
   );
 }
