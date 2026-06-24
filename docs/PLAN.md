@@ -4,9 +4,9 @@
 
 ```
 +----------------------------------------+               +----------------------------------------+
-|          Smartphone (On Chest)         |               |       Snapdragon AI PC (In Backpack)   |
+|          Smartphone (On Chest)         |               |          Laptop (In Backpack)          |
 |                                        |               |                                        |
-|  1. Streams Video Feed -----------(USB / adb)------->  |  1. Runs NPU-Accelerated YOLOv8        |
+|  1. Streams Video Feed -----------(USB / adb)------->  |  1. Runs YOLOv8 (CPU/GPU)              |
 |  2. Collects IMU/Gyro Data             |               |  2. Calculates Object Distance/Risk    |
 |                                        |  <---(Socket)-+  3. Maps Context to Action             |
 |  3. Fires Native Vibrate (Haptics)     |               +----------------------------------------+
@@ -44,14 +44,16 @@ graph LR
 
 ---
 
-## Phase 2 — The Brain (NPU Inference)
+## Phase 2 — The Brain (CPU/GPU Inference)
 
 **Goal:** Run YOLOv8-nano on incoming frames, compute hazard level.
+
+> **Note:** No Qualcomm NPU available. Inference runs on standard laptop hardware using `onnxruntime` with CPU or CUDA/DirectML GPU execution provider, whichever is available.
 
 | # | Task | Detail |
 |---|------|--------|
 | 2.1 | Export YOLOv8-nano to ONNX | `yolo export model=yolov8n.pt format=onnx imgsz=640` |
-| 2.2 | Set up `onnxruntime` with Qualcomm EP | Install `onnxruntime-qnn` or fall back to `onnxruntime` CPU/GPU |
+| 2.2 | Set up `onnxruntime` (CPU/GPU) | Install `onnxruntime` (CPU); optionally `onnxruntime-gpu` if CUDA available, or `onnxruntime-directml` for Windows GPU |
 | 2.3 | Write inference loop | Grab frame from WebSocket → preprocess → run ONNX → parse bounding boxes |
 | 2.4 | Implement bounding-box area rule | If `(box_w * box_h) / (frame_w * frame_h) > 0.45` → flag `IMMEDIATE_HAZARD` |
 | 2.5 | Classify distance tiers | `> 45%` = Immediate, `15–45%` = Caution, `< 15%` = Aware |
@@ -108,7 +110,7 @@ graph LR
 | Layer | Technology |
 |-------|-----------|
 | PC server | Python, FastAPI, `websockets` |
-| Inference | `onnxruntime` (QNN EP on Snapdragon) |
+| Inference | `onnxruntime` (CPU; `onnxruntime-gpu`/`onnxruntime-directml` if GPU available) |
 | Model | YOLOv8-nano (ONNX export) |
 | Phone app | React Native (Expo) or Flutter |
 | Phone sensors | Camera, Accelerometer, Vibrator, TTS |
