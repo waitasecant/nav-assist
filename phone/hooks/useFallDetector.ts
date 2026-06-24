@@ -3,17 +3,19 @@ import { Accelerometer } from "expo-sensors";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 
-// Thresholds (tunable in Phase 5)
-const SPIKE_G        = 2.5;   // impact magnitude to start detection
-const SPIKE_MS       = 50;    // spike must sustain this long
-const STILL_G        = 0.3;   // post-impact low-g to confirm fall
-const STILL_MS       = 1000;  // low-g must sustain this long
+// Thresholds
+const SPIKE_G        = 7.0;   // impact magnitude to start detection
+const SPIKE_MS       = 5.0;   // spike must sustain this long
+const STILL_G        = 0.6;   // post-impact low-g to confirm fall
+const STILL_MS       = 100;   // low-g must sustain this long
 const IMPACT_WINDOW  = 3000;  // max ms to wait for still phase after spike
 
 type State = "idle" | "impact";
 
 export function useFallDetector() {
   const [fallDetected, setFallDetected] = useState(false);
+  const [accelMag, setAccelMag] = useState(0);
+  const [fallState, setFallState] = useState<State>("idle");
 
   const state       = useRef<State>("idle");
   const spikeStart  = useRef<number | null>(null);
@@ -27,15 +29,20 @@ export function useFallDetector() {
       const mag = Math.sqrt(x * x + y * y + z * z);
       const now = Date.now();
 
+      setAccelMag(parseFloat(mag.toFixed(2)));
+      setFallState(state.current);
+
       if (state.current === "idle") {
         if (mag > SPIKE_G) {
           if (spikeStart.current === null) {
             spikeStart.current = now;
+            console.log(`[fall] spike start — |a|=${mag.toFixed(3)} g`);
           } else if (now - spikeStart.current >= SPIKE_MS) {
-            state.current   = "impact";
+            state.current    = "impact";
             impactAt.current = now;
             spikeStart.current = null;
             stillStart.current = null;
+            console.log(`[fall] → IMPACT  — |a|=${mag.toFixed(3)} g`);
           }
         } else {
           spikeStart.current = null;
@@ -51,7 +58,9 @@ export function useFallDetector() {
         if (mag < STILL_G) {
           if (stillStart.current === null) {
             stillStart.current = now;
+            console.log(`[fall] still start — |a|=${mag.toFixed(3)} g`);
           } else if (now - stillStart.current >= STILL_MS) {
+            console.log(`[fall] → CONFIRMED — |a|=${mag.toFixed(3)} g (still for ${STILL_MS} ms)`);
             state.current      = "idle";
             impactAt.current   = null;
             stillStart.current = null;
@@ -76,5 +85,5 @@ export function useFallDetector() {
     setFallDetected(false);
   }
 
-  return { fallDetected, dismiss };
+  return { fallDetected, dismiss, accelMag, fallState };
 }

@@ -8,9 +8,11 @@ interface Props {
   fps: number;
   frameCount: number;
   hazard: string | null;
+  accelMag: number;
+  fallState: string;
 }
 
-export function StatsOverlay({ status, latency, fps, frameCount, hazard }: Props) {
+export function StatsOverlay({ status, latency, fps, frameCount, hazard, accelMag, fallState }: Props) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>NavAssist</Text>
@@ -20,6 +22,8 @@ export function StatsOverlay({ status, latency, fps, frameCount, hazard }: Props
       <StatRow label="FPS" value={String(fps)} />
       <StatRow label="Total Frames" value={String(frameCount)} />
       <StatRow label="Hazard" value={hazard ?? "Clear"} />
+      <StatRow label="Accel |a|" value={`${accelMag} g`} />
+      <StatRow label="Fall State" value={fallState} />
     </View>
   );
 }

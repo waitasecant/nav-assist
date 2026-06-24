@@ -47,7 +47,7 @@ async def websocket_endpoint(ws: WebSocket):
                 icon = TIER_ICON.get(top["tier"], "  ")
                 print(
                     f"\r{icon} {top['tier']:9s} | {top['label']:16s} "
-                    f"{top['area_ratio'] * 100:5.1f}% | {fps:.1f} FPS | "
+                    f"area: {top['area_ratio'] * 100:5.1f}% | {fps:.1f} FPS | "
                     f"frame {frame_count:04d}   ",
                     end="",
                 )

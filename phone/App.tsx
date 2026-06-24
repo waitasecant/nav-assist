@@ -11,7 +11,7 @@ export default function App() {
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const { stats, connect, startFpsCounter, stop } = useStreamer(cameraRef);
-  const { fallDetected, dismiss } = useFallDetector();
+  const { fallDetected, dismiss, accelMag, fallState } = useFallDetector();
 
   useEffect(() => {
     const timer = startFpsCounter();
@@ -31,7 +31,7 @@ export default function App() {
   return (
     <View style={styles.container}>
       <CameraView ref={cameraRef} style={styles.camera} facing="back" mute />
-      <StatsOverlay {...stats} />
+      <StatsOverlay {...stats} accelMag={accelMag} fallState={fallState} />
       {fallDetected && <FallAlert onDismiss={dismiss} />}
     </View>
   );
