@@ -54,3 +54,8 @@ CLAUDE.md
 # folders
 docs/
 .github/
+.vscode/
+
+# model
+*.onnx
+*.pt

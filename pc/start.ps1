@@ -1,11 +1,9 @@
-# NavAssist - Phase 1 PC startup script
+# PC startup script
 # Run from the /pc directory: .\start.ps1
 
-Write-Host "`nNavAssist PC Server - Phase 1 Network Bridge" -ForegroundColor Cyan
-
-# Print the expected hotspot IP
+Write-Host "`nPC Server" -ForegroundColor Cyan
 Write-Host "Expected hotspot IP: 192.168.137.1" -ForegroundColor Yellow
-Write-Host "Confirm in:  Settings > Network & Internet > Mobile Hotspot`n" -ForegroundColor Yellow
+Write-Host "Confirm in: Settings > Network & Internet > Mobile Hotspot`n" -ForegroundColor Yellow
 
 # Create and activate venv if it doesn't exist
 if (-not (Test-Path "venv")) {
@@ -16,8 +14,21 @@ if (-not (Test-Path "venv")) {
 Write-Host "Activating virtual environment..." -ForegroundColor Green
 . venv\Scripts\Activate.ps1
 
-# Install dependencies
-Write-Host "Installing dependencies..." -ForegroundColor Green
+# One-time model export if yolov8n.onnx is missing
+if (-not (Test-Path "model\yolov8n.onnx")) {
+    Write-Host "yolov8n.onnx not found - running first-time setup..." -ForegroundColor Yellow
+    Write-Host "Installing export dependencies (ultralytics + torch, ~600 MB)..." -ForegroundColor Green
+    pip install -r requirements-export.txt --quiet
+    Write-Host "Exporting YOLOv8-nano to ONNX..." -ForegroundColor Green
+    python export_model.py
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "Export failed. Check output above." -ForegroundColor Red
+        exit 1
+    }
+}
+
+# Install runtime dependencies
+Write-Host "Installing runtime dependencies..." -ForegroundColor Green
 pip install -r requirements.txt --quiet
 
 Write-Host "`nStarting FastAPI server on 0.0.0.0:8000 ..." -ForegroundColor Green

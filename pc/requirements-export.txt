@@ -1,0 +1,4 @@
+# One-time export dependencies
+ultralytics>=8.0.0
+onnx==1.22.0
+onnxslim==0.1.94
