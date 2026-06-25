@@ -45,6 +45,7 @@ yarn-error.*
 __pycache__/
 venv/
 .venv/
+*.pyc
 
 # claude
 .claude/
@@ -56,6 +57,8 @@ docs/
 .github/
 .vscode/
 
-# model
-*.onnx
-*.pt
+# downloads
+*.dll
+*.exe
+server/lib/
+model/
