@@ -55,7 +55,3 @@ CLAUDE.md
 docs/
 .github/
 .vscode/
-
-# model
-*.onnx
-*.pt
