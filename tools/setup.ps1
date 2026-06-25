@@ -15,7 +15,14 @@ Write-Host "Activating virtual environment..." -ForegroundColor Green
 . venv\Scripts\Activate.ps1
 
 Write-Host "Installing dependencies..." -ForegroundColor Green
-pip install -r requirements.txt --quiet
+pip install -r requirements.txt
 
 Write-Host "Running export..." -ForegroundColor Green
 python export.py
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Export failed. Check output above." -ForegroundColor Red
+    exit 1
+}
+
+Remove-Item "yolov8n.pt" -ErrorAction SilentlyContinue
+Write-Host "Done." -ForegroundColor Green
