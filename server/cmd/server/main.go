@@ -12,10 +12,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	ort "github.com/yalue/onnxruntime_go"
 
 	"navassist/internal/commands"
 	"navassist/internal/inference"
+	"navassist/internal/logger"
+	"navassist/internal/metrics"
 )
 
 type config struct {
@@ -23,6 +26,7 @@ type config struct {
 	depthModelPath string
 	ortLib         string
 	port           string
+	logPath        string
 }
 
 func parseConfig() config {
@@ -31,6 +35,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.depthModelPath, "depth-model", "../model/midas_small.onnx", "path to MiDaS ONNX")
 	flag.StringVar(&cfg.ortLib,         "ort",         "lib/onnxruntime.dll",       "path to ORT shared library")
 	flag.StringVar(&cfg.port,           "port",        "8000",                      "listen port")
+	flag.StringVar(&cfg.logPath,        "log",         "session.db",                "path to SQLite session log")
 	flag.Parse()
 	return cfg
 }
@@ -66,9 +71,18 @@ func main() {
 	}
 
 	slog.Info("model loaded", "path", cfg.modelPath)
-	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
 
-	http.HandleFunc("/ws", makeHandler(model, depthModel))
+	log, err := logger.New(cfg.logPath)
+	if err != nil {
+		slog.Warn("session logger unavailable", "err", err)
+	} else {
+		defer log.Close()
+		slog.Info("session log opened", "path", cfg.logPath)
+	}
+
+	http.Handle("/metrics", promhttp.Handler())
+	http.HandleFunc("/ws", makeHandler(model, depthModel, log))
+	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
 	if err := http.ListenAndServe(":"+cfg.port, nil); err != nil {
 		slog.Error("server failed", "err", err)
 	}
@@ -97,7 +111,7 @@ func tierIcon(tier string) string {
 	}
 }
 
-func makeHandler(model *inference.Model, depth *inference.DepthModel) http.HandlerFunc {
+func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logger.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -128,6 +142,7 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel) http.Handl
 				continue
 			}
 
+			inferStart := time.Now()
 			dets, err := model.Run(jpegBytes)
 			if err != nil {
 				slog.Warn("inference error", "err", err)
@@ -145,12 +160,19 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel) http.Handl
 				}
 			}
 
+			metrics.InferenceLatency.Observe(float64(time.Since(inferStart).Milliseconds()))
+
 			count++
 			fps := float32(count) / float32(time.Since(start).Seconds())
+			metrics.ServerFPS.Set(float64(fps))
 			cmds := commands.Build(dets, last)
 
 			if len(dets) > 0 {
 				top := dets[0]
+				metrics.TierTotal.WithLabelValues(top.Tier).Inc()
+				if log != nil && top.Tier != "AWARE" {
+					log.LogEvent(top.Tier, top.Label, top.Depth)
+				}
 				fmt.Printf("\r%s %-9s | %-16s area: %5.1f%% | %.1f FPS | frame %04d   ",
 					tierIcon(top.Tier), top.Tier, top.Label, top.AreaRatio*100, fps, count)
 			} else {

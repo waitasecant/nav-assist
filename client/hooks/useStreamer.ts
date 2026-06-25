@@ -18,7 +18,10 @@ interface Stats {
   hazard: string | null;
 }
 
-export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
+export function useStreamer(
+  cameraRef: React.RefObject<CameraView | null>,
+  onHazard?: (tier: string, label: string, depth: number) => void
+) {
   const wsRef = useRef<WebSocket | null>(null);
   const lastSentAtRef = useRef<number>(0);
   const frameCountRef = useRef(0);
@@ -102,6 +105,10 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
         : null;
       const hazard = top ? `${top.tier} - ${top.label} (${depthStr})` : null;
       setStats((s) => ({ ...s, latency: rtt, hazard }));
+
+      if (top && top.tier !== "AWARE" && onHazard) {
+        onHazard(top.tier, top.label, top.depth);
+      }
 
       for (const cmd of msg.commands ?? []) {
         if (cmd.action === "vibrate") {
