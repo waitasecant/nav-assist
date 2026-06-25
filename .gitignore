@@ -60,5 +60,6 @@ docs/
 # downloads
 *.dll
 *.exe
+*.pt
 server/lib/
 model/

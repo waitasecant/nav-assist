@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
+	"image/jpeg"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -16,33 +18,60 @@ import (
 	"navassist/internal/inference"
 )
 
+type config struct {
+	modelPath      string
+	depthModelPath string
+	ortLib         string
+	port           string
+}
+
+func parseConfig() config {
+	var cfg config
+	flag.StringVar(&cfg.modelPath,      "model",       "../model/yolov8n.onnx",     "path to yolov8n.onnx")
+	flag.StringVar(&cfg.depthModelPath, "depth-model", "../model/midas_small.onnx", "path to MiDaS ONNX")
+	flag.StringVar(&cfg.ortLib,         "ort",         "lib/onnxruntime.dll",       "path to ORT shared library")
+	flag.StringVar(&cfg.port,           "port",        "8000",                      "listen port")
+	flag.Parse()
+	return cfg
+}
+
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
 func main() {
-	modelPath := flag.String("model", "../model/yolov8n.onnx", "path to yolov8n.onnx")
-	ortLib    := flag.String("ort", "lib/onnxruntime.dll", "path to ORT shared library")
-	port      := flag.String("port", "8000", "listen port")
-	flag.Parse()
+	cfg := parseConfig()
 
-	ort.SetSharedLibraryPath(*ortLib)
+	ort.SetSharedLibraryPath(cfg.ortLib)
 	if err := ort.InitializeEnvironment(); err != nil {
-		log.Fatalf("ort init: %v", err)
+		slog.Error("ort init failed", "err", err)
+		return
 	}
 	defer ort.DestroyEnvironment()
 
-	model, err := inference.New(*modelPath)
+	model, err := inference.New(cfg.modelPath)
 	if err != nil {
-		log.Fatalf("load model: %v", err)
+		slog.Error("load model failed", "path", cfg.modelPath, "err", err)
+		return
 	}
 	defer model.Close()
 
-	fmt.Printf("[YOLO] model: %s\n", *modelPath)
-	fmt.Printf("[server] listening on 0.0.0.0:%s/ws\n", *port)
+	var depthModel *inference.DepthModel
+	if dm, err := inference.NewDepth(cfg.depthModelPath); err != nil {
+		slog.Warn("depth model unavailable, falling back to area ratio", "err", err)
+	} else {
+		depthModel = dm
+		defer depthModel.Close()
+		slog.Info("depth model loaded", "path", cfg.depthModelPath)
+	}
 
-	http.HandleFunc("/ws", makeHandler(model))
-	log.Fatal(http.ListenAndServe(":"+*port, nil))
+	slog.Info("model loaded", "path", cfg.modelPath)
+	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
+
+	http.HandleFunc("/ws", makeHandler(model, depthModel))
+	if err := http.ListenAndServe(":"+cfg.port, nil); err != nil {
+		slog.Error("server failed", "err", err)
+	}
 }
 
 type frameMsg struct {
@@ -68,16 +97,16 @@ func tierIcon(tier string) string {
 	}
 }
 
-func makeHandler(model *inference.Model) http.HandlerFunc {
+func makeHandler(model *inference.Model, depth *inference.DepthModel) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
-			log.Printf("upgrade: %v", err)
+			slog.Error("ws upgrade failed", "err", err)
 			return
 		}
 		defer conn.Close()
 
-		fmt.Println("[+] Phone connected")
+		slog.Info("client connected", "remote", r.RemoteAddr)
 		start := time.Now()
 		var count int64
 		last := &commands.LastSpoken{}
@@ -85,6 +114,7 @@ func makeHandler(model *inference.Model) http.HandlerFunc {
 		for {
 			_, raw, err := conn.ReadMessage()
 			if err != nil {
+				slog.Info("client disconnected", "remote", r.RemoteAddr)
 				break
 			}
 
@@ -100,8 +130,19 @@ func makeHandler(model *inference.Model) http.HandlerFunc {
 
 			dets, err := model.Run(jpegBytes)
 			if err != nil {
-				log.Printf("inference: %v", err)
+				slog.Warn("inference error", "err", err)
 				continue
+			}
+
+			if depth != nil {
+				cfg2, err := jpeg.DecodeConfig(bytes.NewReader(jpegBytes))
+				if err == nil {
+					if closeness, err := depth.Run(jpegBytes); err == nil {
+						dets = inference.AnnotateDepth(dets, closeness, cfg2.Width, cfg2.Height)
+					} else {
+						slog.Warn("depth run failed", "err", err)
+					}
+				}
 			}
 
 			count++

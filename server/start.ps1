@@ -6,7 +6,7 @@ $ORT_URL     = "https://github.com/microsoft/onnxruntime/releases/download/v$ORT
 $ORT_DLL     = "lib\onnxruntime.dll"
 $BINARY      = "navassist.exe"
 
-Write-Host "`nNavAssist — Go Server" -ForegroundColor Cyan
+Write-Host "`nNavAssist - Go Server" -ForegroundColor Cyan
 
 # Check for Go
 if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
@@ -14,7 +14,7 @@ if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-# Check for gcc (required for CGO) — auto-add mingw to PATH if installed
+# Check for gcc (required for CGO) - auto-add mingw to PATH if installed
 $mingwPaths = @(
     "C:\ProgramData\mingw64\mingw64\bin",
     "C:\msys64\mingw64\bin",
@@ -47,12 +47,20 @@ if (-not (Test-Path $ORT_DLL)) {
     Write-Host "ORT DLL ready." -ForegroundColor Green
 }
 
-# Check model exists
+# Check YOLO model exists
 $MODEL = "..\model\yolov8n.onnx"
 if (-not (Test-Path $MODEL)) {
     Write-Host "ERROR: model\yolov8n.onnx not found." -ForegroundColor Red
     Write-Host "Run .\setup.ps1 from the tools\ directory to export it." -ForegroundColor Yellow
     exit 1
+}
+
+# Download MiDaS depth model if missing
+$DEPTH_MODEL = "..\model\midas_small.onnx"
+if (-not (Test-Path $DEPTH_MODEL)) {
+    Write-Host "Downloading MiDaS depth model (~80 MB)..." -ForegroundColor Green
+    Invoke-WebRequest -Uri "https://github.com/isl-org/MiDaS/releases/download/v2_1/model-small.onnx" -OutFile $DEPTH_MODEL
+    Write-Host "Depth model ready." -ForegroundColor Green
 }
 
 # Resolve dependencies on first run

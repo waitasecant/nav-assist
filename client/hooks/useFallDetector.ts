@@ -36,19 +36,19 @@ export function useFallDetector() {
         if (mag > SPIKE_G) {
           if (spikeStart.current === null) {
             spikeStart.current = now;
-            console.log(`[fall] spike start — |a|=${mag.toFixed(3)} g`);
+            console.log(`[fall] spike start - |a|=${mag.toFixed(3)} g`);
           } else if (now - spikeStart.current >= SPIKE_MS) {
             state.current    = "impact";
             impactAt.current = now;
             spikeStart.current = null;
             stillStart.current = null;
-            console.log(`[fall] → IMPACT  — |a|=${mag.toFixed(3)} g`);
+            console.log(`[fall] → IMPACT - |a|=${mag.toFixed(3)} g`);
           }
         } else {
           spikeStart.current = null;
         }
       } else if (state.current === "impact") {
-        // Impact window expired — reset
+        // Impact window expired - reset
         if (now - impactAt.current! > IMPACT_WINDOW) {
           state.current = "idle";
           stillStart.current = null;
@@ -58,9 +58,9 @@ export function useFallDetector() {
         if (mag < STILL_G) {
           if (stillStart.current === null) {
             stillStart.current = now;
-            console.log(`[fall] still start — |a|=${mag.toFixed(3)} g`);
+            console.log(`[fall] still start - |a|=${mag.toFixed(3)} g`);
           } else if (now - stillStart.current >= STILL_MS) {
-            console.log(`[fall] → CONFIRMED — |a|=${mag.toFixed(3)} g (still for ${STILL_MS} ms)`);
+            console.log(`[fall] → CONFIRMED - |a|=${mag.toFixed(3)} g (still for ${STILL_MS} ms)`);
             state.current      = "idle";
             impactAt.current   = null;
             stillStart.current = null;

@@ -54,7 +54,7 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
             frameCountRef.current++;
           }
         } catch (_) {
-          // camera not ready — skip frame
+          // camera not ready - skip frame
         }
       }
 
@@ -64,6 +64,8 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
     capture();
   }, [cameraRef]);
 
+  const retryDelayRef = useRef(1000);
+
   const connect = useCallback(() => {
     setStats((s) => ({ ...s, status: "Connecting…" }));
 
@@ -71,14 +73,17 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      retryDelayRef.current = 1000;
       setStats((s) => ({ ...s, status: "Connected ✓" }));
       startCapture();
     };
 
     ws.onclose = () => {
-      setStats((s) => ({ ...s, status: "Disconnected — retrying in 2 s" }));
       streamingRef.current = false;
-      setTimeout(connect, 2000);
+      const delay = retryDelayRef.current;
+      retryDelayRef.current = Math.min(delay * 2, 30000);
+      setStats((s) => ({ ...s, status: `Disconnected - retrying in ${delay / 1000}s` }));
+      setTimeout(connect, delay);
     };
 
     ws.onerror = () => {
@@ -90,7 +95,12 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
       const msg = JSON.parse(event.data as string);
 
       const top = msg.detections?.[0] ?? null;
-      const hazard = top ? `${top.tier} — ${top.label} (${(top.area_ratio * 100).toFixed(0)}%)` : null;
+      const depthStr = top
+        ? top.depth >= 0
+          ? `${(top.depth * 100).toFixed(0)}% close`
+          : `${(top.area_ratio * 100).toFixed(0)}% area`
+        : null;
+      const hazard = top ? `${top.tier} - ${top.label} (${depthStr})` : null;
       setStats((s) => ({ ...s, latency: rtt, hazard }));
 
       for (const cmd of msg.commands ?? []) {

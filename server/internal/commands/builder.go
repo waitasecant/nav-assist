@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"sort"
 	"time"
 
 	"navassist/internal/inference"
@@ -22,7 +23,49 @@ type LastSpoken struct {
 	At    time.Time
 }
 
-// Build derives haptic and TTS commands from the top detection.
+var tierRank = map[string]int{
+	"IMMEDIATE": 0,
+	"CAUTION":   1,
+	"AWARE":     2,
+}
+
+var classPriority = map[string]int{
+	"person":     0,
+	"car":        1,
+	"bicycle":    2,
+	"truck":      3,
+	"bus":        4,
+	"motorcycle": 5,
+	"chair":      6,
+}
+
+func classPrio(label string) int {
+	if p, ok := classPriority[label]; ok {
+		return p
+	}
+	return 99
+}
+
+// prioritise returns a copy of dets sorted by tier → class priority → area ratio.
+func prioritise(dets []inference.Detection) []inference.Detection {
+	sorted := make([]inference.Detection, len(dets))
+	copy(sorted, dets)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		if tierRank[sorted[i].Tier] != tierRank[sorted[j].Tier] {
+			return tierRank[sorted[i].Tier] < tierRank[sorted[j].Tier]
+		}
+		if classPrio(sorted[i].Label) != classPrio(sorted[j].Label) {
+			return classPrio(sorted[i].Label) < classPrio(sorted[j].Label)
+		}
+		if sorted[i].Depth >= 0 && sorted[j].Depth >= 0 {
+			return sorted[i].Depth > sorted[j].Depth
+		}
+		return sorted[i].AreaRatio > sorted[j].AreaRatio
+	})
+	return sorted
+}
+
+// Build derives haptic and TTS commands from the highest-priority detection.
 // Vibrate on every IMMEDIATE/CAUTION frame.
 // Speak only when tier/label changes or the cooldown has expired.
 func Build(dets []inference.Detection, last *LastSpoken) []Command {
@@ -30,7 +73,7 @@ func Build(dets []inference.Detection, last *LastSpoken) []Command {
 		return nil
 	}
 
-	top := dets[0]
+	top := prioritise(dets)[0]
 	var cmds []Command
 
 	switch top.Tier {
