@@ -24,10 +24,12 @@ const (
 
 // Detection holds a single YOLO detection result.
 type Detection struct {
-	Label     string  `json:"label"`
-	Conf      float32 `json:"conf"`
-	AreaRatio float32 `json:"area_ratio"`
-	Tier      string  `json:"tier"`
+	Label     string     `json:"label"`
+	Conf      float32    `json:"conf"`
+	BBox      [4]float32 `json:"bbox"`       // x1, y1, x2, y2 in original image coords
+	AreaRatio float32    `json:"area_ratio"`
+	Depth     float32    `json:"depth"`      // normalized closeness 0-1 (-1 = unavailable)
+	Tier      string     `json:"tier"`
 }
 
 // Model wraps an ORT session for YOLOv8-nano inference.
@@ -173,7 +175,9 @@ func postprocess(raw []float32, sx, sy float32, frameArea int) []Detection {
 		dets = append(dets, Detection{
 			Label:     cocoClasses[c.class],
 			Conf:      c.conf,
+			BBox:      [4]float32{c.box[0], c.box[1], c.box[0] + c.box[2], c.box[1] + c.box[3]},
 			AreaRatio: ratio,
+			Depth:     -1,
 			Tier:      classifyTier(ratio),
 		})
 	}
@@ -192,4 +196,62 @@ func classifyTier(ratio float32) string {
 		return "CAUTION"
 	}
 	return "AWARE"
+}
+
+// AnnotateDepth computes per-detection closeness from a MiDaS closeness map
+// and re-classifies each detection's Tier using depth thresholds.
+func AnnotateDepth(dets []Detection, closeness []float32, origW, origH int) []Detection {
+	scaleX := float32(depthSize) / float32(origW)
+	scaleY := float32(depthSize) / float32(origH)
+
+	for i := range dets {
+		x1 := clampInt(int(dets[i].BBox[0]*scaleX), 0, depthSize-1)
+		y1 := clampInt(int(dets[i].BBox[1]*scaleY), 0, depthSize-1)
+		x2 := clampInt(int(dets[i].BBox[2]*scaleX), 0, depthSize-1)
+		y2 := clampInt(int(dets[i].BBox[3]*scaleY), 0, depthSize-1)
+
+		vals := make([]float32, 0, (x2-x1+1)*(y2-y1+1))
+		for row := y1; row <= y2; row++ {
+			for col := x1; col <= x2; col++ {
+				vals = append(vals, closeness[row*depthSize+col])
+			}
+		}
+		if len(vals) == 0 {
+			continue
+		}
+		dets[i].Depth = medianF32(vals)
+		dets[i].Tier  = classifyTierByDepth(dets[i].Depth)
+	}
+	return dets
+}
+
+func classifyTierByDepth(closeness float32) string {
+	if closeness > 0.75 {
+		return "IMMEDIATE"
+	}
+	if closeness > 0.45 {
+		return "CAUTION"
+	}
+	return "AWARE"
+}
+
+func medianF32(vals []float32) float32 {
+	sorted := make([]float32, len(vals))
+	copy(sorted, vals)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+	n := len(sorted)
+	if n%2 == 0 {
+		return (sorted[n/2-1] + sorted[n/2]) / 2
+	}
+	return sorted[n/2]
+}
+
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }

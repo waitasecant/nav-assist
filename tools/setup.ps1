@@ -1,4 +1,4 @@
-# Tools setup script — creates venv and installs dependencies
+# Tools setup script - creates venv and installs dependencies
 # Run from the tools/ directory: .\setup.ps1
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"image/jpeg"
 	"log/slog"
 	"net/http"
 	"time"
@@ -17,16 +19,18 @@ import (
 )
 
 type config struct {
-	modelPath string
-	ortLib    string
-	port      string
+	modelPath      string
+	depthModelPath string
+	ortLib         string
+	port           string
 }
 
 func parseConfig() config {
 	var cfg config
-	flag.StringVar(&cfg.modelPath, "model", "../model/yolov8n.onnx", "path to yolov8n.onnx")
-	flag.StringVar(&cfg.ortLib,    "ort",   "lib/onnxruntime.dll",   "path to ORT shared library")
-	flag.StringVar(&cfg.port,      "port",  "8000",                  "listen port")
+	flag.StringVar(&cfg.modelPath,      "model",       "../model/yolov8n.onnx",     "path to yolov8n.onnx")
+	flag.StringVar(&cfg.depthModelPath, "depth-model", "../model/midas_small.onnx", "path to MiDaS ONNX")
+	flag.StringVar(&cfg.ortLib,         "ort",         "lib/onnxruntime.dll",       "path to ORT shared library")
+	flag.StringVar(&cfg.port,           "port",        "8000",                      "listen port")
 	flag.Parse()
 	return cfg
 }
@@ -52,10 +56,19 @@ func main() {
 	}
 	defer model.Close()
 
+	var depthModel *inference.DepthModel
+	if dm, err := inference.NewDepth(cfg.depthModelPath); err != nil {
+		slog.Warn("depth model unavailable, falling back to area ratio", "err", err)
+	} else {
+		depthModel = dm
+		defer depthModel.Close()
+		slog.Info("depth model loaded", "path", cfg.depthModelPath)
+	}
+
 	slog.Info("model loaded", "path", cfg.modelPath)
 	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
 
-	http.HandleFunc("/ws", makeHandler(model))
+	http.HandleFunc("/ws", makeHandler(model, depthModel))
 	if err := http.ListenAndServe(":"+cfg.port, nil); err != nil {
 		slog.Error("server failed", "err", err)
 	}
@@ -84,7 +97,7 @@ func tierIcon(tier string) string {
 	}
 }
 
-func makeHandler(model *inference.Model) http.HandlerFunc {
+func makeHandler(model *inference.Model, depth *inference.DepthModel) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -119,6 +132,17 @@ func makeHandler(model *inference.Model) http.HandlerFunc {
 			if err != nil {
 				slog.Warn("inference error", "err", err)
 				continue
+			}
+
+			if depth != nil {
+				cfg2, err := jpeg.DecodeConfig(bytes.NewReader(jpegBytes))
+				if err == nil {
+					if closeness, err := depth.Run(jpegBytes); err == nil {
+						dets = inference.AnnotateDepth(dets, closeness, cfg2.Width, cfg2.Height)
+					} else {
+						slog.Warn("depth run failed", "err", err)
+					}
+				}
 			}
 
 			count++

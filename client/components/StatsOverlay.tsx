@@ -18,7 +18,7 @@ export function StatsOverlay({ status, latency, fps, frameCount, hazard, accelMa
       <Text style={styles.title}>NavAssist</Text>
       <StatRow label="Server" value={`${PC_IP}:${WS_PORT}`} />
       <StatRow label="Status" value={status} />
-      <StatRow label="RTT Latency" value={latency != null ? `${latency} ms` : "—"} />
+      <StatRow label="RTT Latency" value={latency != null ? `${latency} ms` : "-"} />
       <StatRow label="FPS" value={String(fps)} />
       <StatRow label="Total Frames" value={String(frameCount)} />
       <StatRow label="Hazard" value={hazard ?? "Clear"} />

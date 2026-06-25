@@ -54,7 +54,7 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
             frameCountRef.current++;
           }
         } catch (_) {
-          // camera not ready — skip frame
+          // camera not ready - skip frame
         }
       }
 
@@ -82,7 +82,7 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
       streamingRef.current = false;
       const delay = retryDelayRef.current;
       retryDelayRef.current = Math.min(delay * 2, 30000);
-      setStats((s) => ({ ...s, status: `Disconnected — retrying in ${delay / 1000}s` }));
+      setStats((s) => ({ ...s, status: `Disconnected - retrying in ${delay / 1000}s` }));
       setTimeout(connect, delay);
     };
 
@@ -95,7 +95,12 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
       const msg = JSON.parse(event.data as string);
 
       const top = msg.detections?.[0] ?? null;
-      const hazard = top ? `${top.tier} — ${top.label} (${(top.area_ratio * 100).toFixed(0)}%)` : null;
+      const depthStr = top
+        ? top.depth >= 0
+          ? `${(top.depth * 100).toFixed(0)}% close`
+          : `${(top.area_ratio * 100).toFixed(0)}% area`
+        : null;
+      const hazard = top ? `${top.tier} - ${top.label} (${depthStr})` : null;
       setStats((s) => ({ ...s, latency: rtt, hazard }));
 
       for (const cmd of msg.commands ?? []) {

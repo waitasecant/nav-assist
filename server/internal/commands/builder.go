@@ -57,6 +57,9 @@ func prioritise(dets []inference.Detection) []inference.Detection {
 		if classPrio(sorted[i].Label) != classPrio(sorted[j].Label) {
 			return classPrio(sorted[i].Label) < classPrio(sorted[j].Label)
 		}
+		if sorted[i].Depth >= 0 && sorted[j].Depth >= 0 {
+			return sorted[i].Depth > sorted[j].Depth
+		}
 		return sorted[i].AreaRatio > sorted[j].AreaRatio
 	})
 	return sorted
