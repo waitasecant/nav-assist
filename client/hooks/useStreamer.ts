@@ -64,6 +64,8 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
     capture();
   }, [cameraRef]);
 
+  const retryDelayRef = useRef(1000);
+
   const connect = useCallback(() => {
     setStats((s) => ({ ...s, status: "Connecting…" }));
 
@@ -71,14 +73,17 @@ export function useStreamer(cameraRef: React.RefObject<CameraView | null>) {
     wsRef.current = ws;
 
     ws.onopen = () => {
+      retryDelayRef.current = 1000;
       setStats((s) => ({ ...s, status: "Connected ✓" }));
       startCapture();
     };
 
     ws.onclose = () => {
-      setStats((s) => ({ ...s, status: "Disconnected — retrying in 2 s" }));
       streamingRef.current = false;
-      setTimeout(connect, 2000);
+      const delay = retryDelayRef.current;
+      retryDelayRef.current = Math.min(delay * 2, 30000);
+      setStats((s) => ({ ...s, status: `Disconnected — retrying in ${delay / 1000}s` }));
+      setTimeout(connect, delay);
     };
 
     ws.onerror = () => {

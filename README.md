@@ -68,13 +68,13 @@ graph LR
 │   ├── go.mod
 │   └── start.ps1                   # One-command build + run (Windows)
 ├── tools/
-│   ├── export.py               # YOLOv8 → ONNX export script
-│   ├── requirements.txt        # Python dependencies for tools
-│   └── setup.ps1               # Creates venv, installs deps, runs export
+│   ├── export.py                   # YOLOv8 → ONNX export script
+│   ├── requirements.txt            # Python dependencies for tools
+│   └── setup.ps1                   # Creates venv, installs deps, runs export
 └── client/
     ├── App.tsx                     # Root component
     ├── hooks/
-    │   ├── useStreamer.ts           # WebSocket + camera capture + command handler
+    │   ├── useStreamer.ts          # WebSocket + camera capture + command handler
     │   └── useFallDetector.ts      # IMU-based fall detection
     └── components/
         ├── StatsOverlay.tsx        # Live debug overlay (status, FPS, hazard tier)
