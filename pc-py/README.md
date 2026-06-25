@@ -53,7 +53,7 @@ Spoken alerts are debounced server-side (3 s cooldown + fires on tier/label chan
 
 ```
 .
-├── pc/
+├── pc-py/
 │   ├── server.py                   # FastAPI WebSocket server
 │   ├── utils.py                    # Command-building logic (haptic/TTS)
 │   ├── export.py                   # One-time YOLOv8 → ONNX export script
