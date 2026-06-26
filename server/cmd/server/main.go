@@ -74,6 +74,31 @@ var (
 	latest   statusSnapshot
 )
 
+// narration holds the latest LLM-generated scene summary.
+var narration struct {
+	mu      sync.Mutex
+	text    string
+	pending bool
+}
+
+func setNarration(text string) {
+	narration.mu.Lock()
+	narration.text = text
+	narration.pending = true
+	narration.mu.Unlock()
+}
+
+// popNarration returns the pending narration (if any) and clears it.
+func popNarration() string {
+	narration.mu.Lock()
+	defer narration.mu.Unlock()
+	if !narration.pending {
+		return ""
+	}
+	narration.pending = false
+	return narration.text
+}
+
 func updateLatest(fps float32, count int64, dets []inference.Detection) {
 	tier := "CLEAR"
 	if len(dets) > 0 {
@@ -125,6 +150,7 @@ func main() {
 	http.HandleFunc("/status", statusHandler)
 	http.HandleFunc("/dashboard", dashboardHandler)
 	http.HandleFunc("/fall", fallHandler)
+	http.HandleFunc("/narration", narrationHandler)
 	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
 	if err := http.ListenAndServe(":"+cfg.port, nil); err != nil {
 		slog.Error("server failed", "err", err)
@@ -226,6 +252,10 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 			fps := float32(count) / float32(time.Since(start).Seconds())
 			metrics.ServerFPS.Set(float64(fps))
 			cmds := commands.Build(dets, last)
+			if n := popNarration(); n != "" {
+				cmds = append(cmds, commands.Command{Action: "speak", Text: n})
+				slog.Info("narration spoken", "text", n)
+			}
 			updateLatest(fps, count, dets)
 
 			if len(dets) > 0 {
@@ -254,6 +284,23 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 		}
 		fmt.Printf("\n[-] Phone disconnected after %d frames\n", count)
 	}
+}
+
+func narrationHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		Text string `json:"text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Text == "" {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	setNarration(body.Text)
+	slog.Info("narration received", "text", body.Text)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func statusHandler(w http.ResponseWriter, r *http.Request) {

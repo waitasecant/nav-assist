@@ -2,3 +2,5 @@
 ultralytics>=8.0.0
 onnx==1.22.0
 onnxslim==0.1.94
+llama-cpp-python>=0.2.0
+requests>=2.31.0
