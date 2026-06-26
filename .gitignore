@@ -61,5 +61,6 @@ docs/
 *.dll
 *.exe
 *.pt
+*.db
 server/lib/
 model/

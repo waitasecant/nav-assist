@@ -44,5 +44,14 @@ export function useSessionLog() {
     );
   };
 
-  return { logEvent };
+  const getRecentEvents = async (limit = 20) => {
+    const db = dbRef.current;
+    if (!db) return [];
+    return db.getAllAsync<{ ts: number; tier: string; label: string; depth: number; lat: number | null; lon: number | null }>(
+      "SELECT ts, tier, label, depth, lat, lon FROM events ORDER BY ts DESC LIMIT ?",
+      limit
+    );
+  };
+
+  return { logEvent, getRecentEvents };
 }
