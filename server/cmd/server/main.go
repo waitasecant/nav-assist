@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,7 @@ import (
 	ort "github.com/yalue/onnxruntime_go"
 
 	"navassist/internal/commands"
+	"navassist/internal/dashboard"
 	"navassist/internal/inference"
 	"navassist/internal/logger"
 	"navassist/internal/metrics"
@@ -32,6 +34,7 @@ type config struct {
 	ortLib         string
 	port           string
 	logPath        string
+	recordDir      string
 }
 
 func parseConfig() config {
@@ -41,6 +44,7 @@ func parseConfig() config {
 	flag.StringVar(&cfg.ortLib,         "ort",         "lib/onnxruntime.dll",       "path to ORT shared library")
 	flag.StringVar(&cfg.port,           "port",        "8000",                      "listen port")
 	flag.StringVar(&cfg.logPath,        "log",         "session.db",                "path to SQLite session log")
+	flag.StringVar(&cfg.recordDir,      "record",      "",                          "directory for frame recordings (empty = disabled)")
 	flag.Parse()
 	return cfg
 }
@@ -99,6 +103,57 @@ func popNarration() string {
 	return narration.text
 }
 
+// frame store — latest JPEG served at GET /frame
+var (
+	frameMu   sync.RWMutex
+	frameJPEG []byte
+)
+
+func storeFrame(b []byte) {
+	frameMu.Lock()
+	frameJPEG = b
+	frameMu.Unlock()
+}
+
+// ttcStore — closing-speed estimate from tools/ttc.py
+var ttcStore struct {
+	mu           sync.Mutex
+	closingSpeed float32
+}
+
+func setTTC(v float32) {
+	ttcStore.mu.Lock()
+	ttcStore.closingSpeed = v
+	ttcStore.mu.Unlock()
+}
+
+// recording support
+var manifestMu sync.Mutex
+
+type manifestEntry struct {
+	TS         int64                 `json:"ts"`
+	FrameID    int64                 `json:"frame_id"`
+	File       string                `json:"file"`
+	Detections []inference.Detection `json:"detections"`
+}
+
+func saveFrame(dir string, id int64, jpegData []byte, dets []inference.Detection) {
+	name := fmt.Sprintf("frame_%06d.jpg", id)
+	if err := os.WriteFile(filepath.Join(dir, name), jpegData, 0644); err != nil {
+		slog.Warn("frame save failed", "err", err)
+		return
+	}
+	entry := manifestEntry{TS: time.Now().UnixMilli(), FrameID: id, File: name, Detections: dets}
+	b, _ := json.Marshal(entry)
+	manifestMu.Lock()
+	f, err := os.OpenFile(filepath.Join(dir, "manifest.jsonl"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err == nil {
+		f.Write(append(b, '\n'))
+		f.Close()
+	}
+	manifestMu.Unlock()
+}
+
 func updateLatest(fps float32, count int64, dets []inference.Detection) {
 	tier := "CLEAR"
 	if len(dets) > 0 {
@@ -145,12 +200,22 @@ func main() {
 		slog.Info("session log opened", "path", cfg.logPath)
 	}
 
+	if cfg.recordDir != "" {
+		if err := os.MkdirAll(cfg.recordDir, 0755); err != nil {
+			slog.Error("create record dir failed", "err", err)
+			return
+		}
+		slog.Info("recording frames", "dir", cfg.recordDir)
+	}
+
 	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/ws", makeHandler(model, depthModel, log))
+	http.HandleFunc("/ws", makeHandler(model, depthModel, log, cfg.recordDir))
 	http.HandleFunc("/status", statusHandler)
 	http.HandleFunc("/dashboard", dashboardHandler)
 	http.HandleFunc("/fall", fallHandler)
 	http.HandleFunc("/narration", narrationHandler)
+	http.HandleFunc("/frame", frameHandler)
+	http.HandleFunc("/ttc", ttcHandler)
 	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
 	if err := http.ListenAndServe(":"+cfg.port, nil); err != nil {
 		slog.Error("server failed", "err", err)
@@ -184,7 +249,7 @@ func tierIcon(tier string) string {
 	}
 }
 
-func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logger.Logger) http.HandlerFunc {
+func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logger.Logger, recordDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -227,6 +292,7 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 			if err != nil {
 				continue
 			}
+			storeFrame(jpegBytes)
 
 			inferStart := time.Now()
 			dets, err := model.RunWithConf(jpegBytes, cfg.Confidence)
@@ -249,6 +315,9 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 			metrics.InferenceLatency.Observe(float64(time.Since(inferStart).Milliseconds()))
 
 			count++
+			if recordDir != "" {
+				go saveFrame(recordDir, count, jpegBytes, dets)
+			}
 			fps := float32(count) / float32(time.Since(start).Seconds())
 			metrics.ServerFPS.Set(float64(fps))
 			cmds := commands.Build(dets, last)
@@ -284,6 +353,35 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 		}
 		fmt.Printf("\n[-] Phone disconnected after %d frames\n", count)
 	}
+}
+
+func frameHandler(w http.ResponseWriter, r *http.Request) {
+	frameMu.RLock()
+	b := frameJPEG
+	frameMu.RUnlock()
+	if b == nil {
+		http.Error(w, "no frame yet", http.StatusServiceUnavailable)
+		return
+	}
+	w.Header().Set("Content-Type", "image/jpeg")
+	w.Write(b)
+}
+
+func ttcHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var body struct {
+		ClosingSpeed float32 `json:"closing_speed"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	setTTC(body.ClosingSpeed)
+	slog.Info("ttc received", "closing_speed", body.ClosingSpeed)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func narrationHandler(w http.ResponseWriter, r *http.Request) {
@@ -367,62 +465,7 @@ func sendSMS(sid, token, from, to, body string) error {
 	return nil
 }
 
-const dashboardHTML = `<!DOCTYPE html>
-<html>
-<head>
-<title>NavAssist Dashboard</title>
-<style>
-  body{background:#111;color:#ddd;font-family:monospace;padding:24px;margin:0}
-  h1{color:#4af;margin-bottom:20px}
-  .stats{display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap}
-  .stat{background:#1a1a1a;padding:12px 20px;border-radius:8px;min-width:80px}
-  .sv{font-size:28px;font-weight:bold;color:#fff}
-  .sl{font-size:12px;color:#888;margin-top:4px}
-  .tier{font-size:28px;font-weight:bold;padding:8px 18px;border-radius:8px;display:inline-block;margin-bottom:20px}
-  .IMMEDIATE{background:#a00;color:#fff}
-  .CAUTION{background:#850;color:#fff}
-  .AWARE{background:#444;color:#ddd}
-  .CLEAR{background:#040;color:#8f8}
-  table{border-collapse:collapse;width:100%}
-  th,td{border:1px solid #333;padding:8px 12px;text-align:left}
-  th{background:#222;color:#4af}
-</style>
-</head>
-<body>
-<h1>NavAssist</h1>
-<div class="stats">
-  <div class="stat"><div class="sv" id="fps">—</div><div class="sl">FPS</div></div>
-  <div class="stat"><div class="sv" id="frames">—</div><div class="sl">Frames</div></div>
-  <div class="stat"><div class="sv" id="age">—</div><div class="sl">Updated</div></div>
-</div>
-<div id="tier" class="tier CLEAR">CLEAR</div>
-<table>
-  <thead><tr><th>Label</th><th>Conf</th><th>Closeness</th><th>Tier</th></tr></thead>
-  <tbody id="tbody"></tbody>
-</table>
-<script>
-async function poll(){
-  try{
-    const d=await(await fetch('/status')).json();
-    document.getElementById('fps').textContent=d.fps.toFixed(1);
-    document.getElementById('frames').textContent=d.frame_count;
-    const ms=Date.now()-d.updated_at;
-    document.getElementById('age').textContent=ms<2000?'live':(ms/1000).toFixed(0)+'s ago';
-    const t=document.getElementById('tier');
-    t.textContent=d.tier;t.className='tier '+d.tier;
-    document.getElementById('tbody').innerHTML=(d.detections||[]).map(x=>
-      '<tr><td>'+x.label+'</td><td>'+(x.conf*100).toFixed(0)+'%</td><td>'+
-      (x.depth>=0?(x.depth*100).toFixed(0)+'%':'—')+'</td><td>'+x.tier+'</td></tr>'
-    ).join('');
-  }catch(e){}
-  setTimeout(poll,1000);
-}
-poll();
-</script>
-</body>
-</html>`
-
 func dashboardHandler(w http.ResponseWriter, _ *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	fmt.Fprint(w, dashboardHTML)
+	fmt.Fprint(w, dashboard.HTML)
 }

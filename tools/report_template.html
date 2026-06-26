@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html><head><title>NavAssist Session Report</title>
+<style>
+body{font-family:monospace;background:#111;color:#ddd;padding:24px}
+h1{color:#4af}h2{color:#8cf;margin-top:24px}
+table{border-collapse:collapse;margin-bottom:16px}
+th,td{border:1px solid #333;padding:6px 12px;text-align:left}
+th{background:#222;color:#4af}
+.map{margin-top:8px}
+</style></head><body>
+<h1>NavAssist Session Report</h1>
+<p>{EVENT_COUNT} events recorded</p>
+<h2>Tier Distribution</h2>
+<table><thead><tr><th>Tier</th><th>Count</th></tr></thead><tbody>{TIER_ROWS}</tbody></table>
+<h2>Top Hazard Labels</h2>
+<table><thead><tr><th>Label</th><th>Count</th></tr></thead><tbody>{LABEL_ROWS}</tbody></table>
+<h2>Recent Events</h2>
+<table><thead><tr><th>Time</th><th>Tier</th><th>Label</th><th>Depth</th></tr></thead><tbody>{EVENT_ROWS}</tbody></table>
+{MAP_SECTION}
+</body></html>
