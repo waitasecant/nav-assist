@@ -85,6 +85,11 @@ func (m *Model) Close() {
 
 // Run decodes a JPEG frame and returns detections sorted by area ratio descending.
 func (m *Model) Run(jpegBytes []byte) ([]Detection, error) {
+	return m.RunWithConf(jpegBytes, confThresh)
+}
+
+// RunWithConf is like Run but uses the provided confidence threshold.
+func (m *Model) RunWithConf(jpegBytes []byte, conf float32) ([]Detection, error) {
 	img, err := jpeg.Decode(bytes.NewReader(jpegBytes))
 	if err != nil {
 		return nil, err
@@ -102,7 +107,7 @@ func (m *Model) Run(jpegBytes []byte) ([]Detection, error) {
 
 	sx := float32(origW) / inputSize
 	sy := float32(origH) / inputSize
-	return postprocess(m.outputTensor.GetData(), sx, sy, origW*origH), nil
+	return postprocess(m.outputTensor.GetData(), sx, sy, origW*origH, conf), nil
 }
 
 // preprocess resizes img to inputSize×inputSize and writes an NCHW float32
@@ -123,7 +128,7 @@ func preprocess(img image.Image, buf []float32) {
 
 // postprocess decodes the YOLOv8 output tensor [1, 84, 8400], applies
 // confidence filtering + NMS, and returns detections.
-func postprocess(raw []float32, sx, sy float32, frameArea int) []Detection {
+func postprocess(raw []float32, sx, sy float32, frameArea int, conf float32) []Detection {
 	type cand struct {
 		box   [4]float32 // x1, y1, w, h in original image coords
 		conf  float32
@@ -142,7 +147,7 @@ func postprocess(raw []float32, sx, sy float32, frameArea int) []Detection {
 				maxClass = c
 			}
 		}
-		if maxScore < confThresh {
+		if maxScore < conf {
 			continue
 		}
 
@@ -199,8 +204,13 @@ func classifyTier(ratio float32) string {
 }
 
 // AnnotateDepth computes per-detection closeness from a MiDaS closeness map
-// and re-classifies each detection's Tier using depth thresholds.
+// and re-classifies each detection's Tier using default depth thresholds.
 func AnnotateDepth(dets []Detection, closeness []float32, origW, origH int) []Detection {
+	return AnnotateDepthWithThresholds(dets, closeness, origW, origH, 0.75, 0.45)
+}
+
+// AnnotateDepthWithThresholds is like AnnotateDepth but uses the provided closeness thresholds.
+func AnnotateDepthWithThresholds(dets []Detection, closeness []float32, origW, origH int, immClose, cautClose float32) []Detection {
 	scaleX := float32(depthSize) / float32(origW)
 	scaleY := float32(depthSize) / float32(origH)
 
@@ -220,16 +230,20 @@ func AnnotateDepth(dets []Detection, closeness []float32, origW, origH int) []De
 			continue
 		}
 		dets[i].Depth = medianF32(vals)
-		dets[i].Tier  = classifyTierByDepth(dets[i].Depth)
+		dets[i].Tier  = classifyTierByDepthWith(dets[i].Depth, immClose, cautClose)
 	}
 	return dets
 }
 
 func classifyTierByDepth(closeness float32) string {
-	if closeness > 0.75 {
+	return classifyTierByDepthWith(closeness, 0.75, 0.45)
+}
+
+func classifyTierByDepthWith(closeness, immClose, cautClose float32) string {
+	if closeness > immClose {
 		return "IMMEDIATE"
 	}
-	if closeness > 0.45 {
+	if closeness > cautClose {
 		return "CAUTION"
 	}
 	return "AWARE"

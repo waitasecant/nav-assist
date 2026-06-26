@@ -2,6 +2,7 @@ import { useRef, useState, useCallback } from "react";
 import { CameraView } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
+import { AppConfig } from "./useConfig";
 
 // Config
 const PC_IP = "localhost";
@@ -20,6 +21,7 @@ interface Stats {
 
 export function useStreamer(
   cameraRef: React.RefObject<CameraView | null>,
+  config: AppConfig,
   onHazard?: (tier: string, label: string, depth: number) => void
 ) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -78,6 +80,12 @@ export function useStreamer(
     ws.onopen = () => {
       retryDelayRef.current = 1000;
       setStats((s) => ({ ...s, status: "Connected ✓" }));
+      ws.send(JSON.stringify({
+        type: "config",
+        confidence: config.confidence,
+        immClose: config.immClose,
+        cautClose: config.cautClose,
+      }));
       startCapture();
     };
 
@@ -118,7 +126,7 @@ export function useStreamer(
                                          Haptics.ImpactFeedbackStyle.Light;
           Haptics.impactAsync(style);
         } else if (cmd.action === "speak") {
-          Speech.speak(cmd.text, { rate: 1.1, language: "en" });
+          Speech.speak(cmd.text, { rate: config.ttsRate, language: "en" });
         }
       }
     };
