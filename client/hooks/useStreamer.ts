@@ -97,15 +97,17 @@ export function useStreamer(
       startCapture();
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       streamingRef.current = false;
+      console.log(`[ws] closed: code=${event.code} reason=${event.reason} clean=${event.wasClean}`);
       const delay = retryDelayRef.current;
       retryDelayRef.current = Math.min(delay * 2, 30000);
       setStats((s) => ({ ...s, status: `Disconnected - retrying in ${delay / 1000}s` }));
       setTimeout(connect, delay);
     };
 
-    ws.onerror = () => {
+    ws.onerror = (event) => {
+      console.error(`[ws] error: ${JSON.stringify(event)}`);
       setStats((s) => ({ ...s, status: "Connection error" }));
     };
 
