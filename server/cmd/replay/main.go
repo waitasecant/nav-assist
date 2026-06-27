@@ -29,7 +29,7 @@ type manifestEntry struct {
 }
 
 func main() {
-	modelPath := flag.String("model", "../../model/yolov8n.onnx", "path to yolov8n.onnx")
+	modelPath := flag.String("model", "../model/yolov8n.onnx", "path to yolov8n.onnx")
 	ortLib := flag.String("ort", "lib/onnxruntime.dll", "path to ORT shared library")
 	dir := flag.String("dir", "", "recording directory (required)")
 	conf := flag.Float64("conf", 0.40, "confidence threshold")
