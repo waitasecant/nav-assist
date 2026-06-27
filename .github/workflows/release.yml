@@ -143,6 +143,8 @@ jobs:
         run: |
           set -euo pipefail
           cd client
+          npx eas-cli whoami || { echo "EXPO_TOKEN invalid or not set"; exit 1; }
+          [ -f eas.json ] || [ -d .eas ] || { echo "EAS not initialised — run 'eas init' in client/ and commit .eas/"; exit 1; }
           BUILD_JSON=$(npx eas-cli build --platform android --profile preview --non-interactive --json)
           BUILD_ID=$(echo "$BUILD_JSON" | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); const r=JSON.parse(d); console.log((Array.isArray(r)?r[0]:r).id)")
           if [ -z "$BUILD_ID" ] || [ "$BUILD_ID" = "null" ]; then
