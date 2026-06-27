@@ -28,7 +28,6 @@ graph LR
     end
 
     subgraph Tools [Sidecar Tools]
-        TTC[ttc.py Optical Flow]
         ANA[analysis.py Report]
     end
 
@@ -40,7 +39,6 @@ graph LR
     CFG -->|confidence / thresholds via WebSocket| CMD
     CMD --> LOG
     CMD --> DASH
-    TTC -->|/ttc POST closing speed| CMD
     LOG -->|session.db| ANA
 ```
 
@@ -135,7 +133,7 @@ When MiDaS is unavailable the system falls back to bounding-box area ratio.
 | [Go](https://go.dev/dl/) 1.22+ | Must be on `PATH` |
 | [MinGW gcc](https://www.msys2.org/) | Required for CGO — `pacman -S mingw-w64-x86_64-gcc` |
 | [ADB](https://developer.android.com/tools/releases/platform-tools) | Must be on `PATH` |
-| [Python 3.10+](https://python.org/downloads/) | For tools (model export, LLM, analysis) |
+| [Python 3.10+](https://python.org/downloads/) | For tools (model export, analysis) |
 | [Expo Go](https://expo.dev/go) | Installed on phone |
 | USB Debugging | Settings -> Developer Options -> USB Debugging |
 
@@ -210,9 +208,7 @@ Scan the QR code with Expo Go. First bundle takes ~60 s.
 
 ---
 
-## Optional Sidecars
-
-### Emergency SMS on Fall
+## Emergency SMS on Fall
 
 Set environment variables before starting the server:
 
@@ -266,6 +262,5 @@ go run .\cmd\replay\ -dir ..\recordings\session1
 | Haptics | `expo-haptics` |
 | TTS | `expo-speech` |
 | Config persistence | `expo-sqlite`, `AsyncStorage` |
-| Optical flow | OpenCV Farneback (optional) |
 | Analysis | SQLite + folium heatmap |
 | Build toolchain | MinGW gcc, Go 1.22 |
