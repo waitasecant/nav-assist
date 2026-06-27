@@ -54,7 +54,7 @@ CLAUDE.md
 
 # folders
 docs/
-.github/
+*.md
 .vscode/
 
 # downloads

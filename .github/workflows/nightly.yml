@@ -1,0 +1,45 @@
+name: Nightly model export
+
+on:
+  schedule:
+    - cron: "0 2 * * *"  # 02:00 UTC daily
+  workflow_dispatch:       # allow manual trigger
+
+jobs:
+  export:
+    name: Export ONNX models & publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install export dependencies
+        run: pip install --quiet -r tools/requirements.txt
+
+      - name: Export YOLO model
+        run: python tools/export.py
+
+      - name: Run smoke test
+        run: |
+          pip install --quiet onnxruntime numpy
+          python tools/smoke_test.py
+
+      - name: Upload ONNX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: onnx-models-${{ github.run_id }}
+          path: model/yolov8n.onnx
+          retention-days: 30
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: models-${{ github.run_number }}
+          name: "Model export ${{ github.run_number }}"
+          body: "Automated nightly ONNX export. Smoke test passed."
+          files: model/yolov8n.onnx
