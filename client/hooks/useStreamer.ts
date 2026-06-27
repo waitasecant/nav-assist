@@ -33,6 +33,7 @@ export function useStreamer(
   const frameCountRef = useRef(0);
   const streamingRef = useRef(false);
   const configRef = useRef(config);
+  const camLoggedRef = useRef(false);
   useEffect(() => { configRef.current = config; }, [config]);
 
   const [stats, setStats] = useState<Stats>({
@@ -44,29 +45,40 @@ export function useStreamer(
   });
 
   const startCapture = useCallback(() => {
-    if (streamingRef.current) return;
+    if (streamingRef.current) {
+      console.log("[capture] already streaming, skip");
+      return;
+    }
     streamingRef.current = true;
+    camLoggedRef.current = false;
+    console.log("[capture] loop started");
 
     const capture = async () => {
       if (!streamingRef.current) return;
 
       const ws = wsRef.current;
       if (cameraRef.current && ws?.readyState === WebSocket.OPEN) {
+        camLoggedRef.current = false;
         try {
           const photo = await cameraRef.current.takePictureAsync({
             quality: 0.3,
             base64: true,
-            skipProcessing: true,
           });
 
           if (photo?.base64 && ws.readyState === WebSocket.OPEN) {
+            if (frameCountRef.current === 0) console.log("[capture] first frame sent");
             lastSentAtRef.current = Date.now();
             ws.send(JSON.stringify({ ts: lastSentAtRef.current, frame: photo.base64 }));
             frameCountRef.current++;
+          } else {
+            console.warn(`[capture] photo null or ws closed: base64=${!!photo?.base64} ws=${ws.readyState}`);
           }
-        } catch (_) {
-          // camera not ready - skip frame
+        } catch (e) {
+          console.error(`[camera] takePictureAsync failed: ${e}`);
         }
+      } else if (!camLoggedRef.current) {
+        camLoggedRef.current = true;
+        console.log(`[capture] waiting: ref=${!!cameraRef.current} ws=${ws?.readyState}`);
       }
 
       setTimeout(capture, 100);
@@ -87,6 +99,7 @@ export function useStreamer(
 
     ws.onopen = () => {
       retryDelayRef.current = 1000;
+      console.log("[ws] opened, calling startCapture");
       setStats((s) => ({ ...s, status: "Connected ✓" }));
       ws.send(JSON.stringify({
         type: "config",
