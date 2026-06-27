@@ -9,9 +9,10 @@ const WS_PORT = 8000;
 
 export { WS_PORT };
 
-// resolveHost returns the server host: config.serverIP if set, else localhost.
+// resolveHost returns the server host: config.serverIP if set, else 127.0.0.1.
+// "localhost" on Android resolves to ::1 (IPv6) which adb reverse does not tunnel.
 export function resolveHost(serverIP: string): string {
-  return serverIP.trim() || "localhost";
+  return serverIP.trim() || "127.0.0.1";
 }
 
 interface Stats {
@@ -31,6 +32,8 @@ export function useStreamer(
   const lastSentAtRef = useRef<number>(0);
   const frameCountRef = useRef(0);
   const streamingRef = useRef(false);
+  const configRef = useRef(config);
+  useEffect(() => { configRef.current = config; }, [config]);
 
   const [stats, setStats] = useState<Stats>({
     status: "Idle",
@@ -77,7 +80,7 @@ export function useStreamer(
   const connect = useCallback(() => {
     setStats((s) => ({ ...s, status: "Connecting…" }));
 
-    const host = resolveHost(config.serverIP);
+    const host = resolveHost(configRef.current.serverIP);
     const ws = new WebSocket(`ws://${host}:${WS_PORT}/ws`);
     wsRef.current = ws;
 
@@ -86,9 +89,9 @@ export function useStreamer(
       setStats((s) => ({ ...s, status: "Connected ✓" }));
       ws.send(JSON.stringify({
         type: "config",
-        confidence: config.confidence,
-        immClose: config.immClose,
-        cautClose: config.cautClose,
+        confidence: configRef.current.confidence,
+        immClose: configRef.current.immClose,
+        cautClose: configRef.current.cautClose,
       }));
       startCapture();
     };
@@ -130,7 +133,7 @@ export function useStreamer(
                                          Haptics.ImpactFeedbackStyle.Light;
           Haptics.impactAsync(style);
         } else if (cmd.action === "speak") {
-          Speech.speak(cmd.text, { rate: config.ttsRate, language: "en" });
+          Speech.speak(cmd.text, { rate: configRef.current.ttsRate, language: "en" });
         }
       }
     };
