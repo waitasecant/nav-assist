@@ -81,6 +81,7 @@ export function useStreamer(
     setStats((s) => ({ ...s, status: "Connecting…" }));
 
     const host = resolveHost(configRef.current.serverIP);
+    console.log(`[ws] connecting to ws://${host}:${WS_PORT}/ws`);
     const ws = new WebSocket(`ws://${host}:${WS_PORT}/ws`);
     wsRef.current = ws;
 
