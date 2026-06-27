@@ -90,18 +90,6 @@ func storeFrame(b []byte) {
 	frameMu.Unlock()
 }
 
-// ttcStore — closing-speed estimate from tools/ttc.py
-var ttcStore struct {
-	mu           sync.Mutex
-	closingSpeed float32
-}
-
-func setTTC(v float32) {
-	ttcStore.mu.Lock()
-	ttcStore.closingSpeed = v
-	ttcStore.mu.Unlock()
-}
-
 // recording support
 var manifestMu sync.Mutex
 
@@ -189,7 +177,6 @@ func main() {
 	http.HandleFunc("/dashboard", dashboardHandler)
 	http.HandleFunc("/fall", fallHandler)
 	http.HandleFunc("/frame", frameHandler)
-	http.HandleFunc("/ttc", ttcHandler)
 	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
 	if err := http.ListenAndServe(":"+cfg.port, nil); err != nil {
 		slog.Error("server failed", "err", err)
@@ -335,23 +322,6 @@ func frameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "image/jpeg")
 	w.Write(b)
-}
-
-func ttcHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	var body struct {
-		ClosingSpeed float32 `json:"closing_speed"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, "bad request", http.StatusBadRequest)
-		return
-	}
-	setTTC(body.ClosingSpeed)
-	slog.Info("ttc received", "closing_speed", body.ClosingSpeed)
-	w.WriteHeader(http.StatusNoContent)
 }
 
 func statusHandler(w http.ResponseWriter, r *http.Request) {

@@ -108,7 +108,6 @@ When MiDaS is unavailable the system falls back to bounding-box area ratio.
 │       └── PermissionScreen.tsx    # Camera permission prompt
 └── tools/
     ├── export.py                   # YOLOv8 -> ONNX export
-    ├── ttc.py                      # Time-to-collision via optical flow
     ├── analysis.py                 # Post-session HTML report + heatmap
     ├── report_template.html        # Report template
     └── requirements.txt            # Python deps for all tools
@@ -122,11 +121,9 @@ When MiDaS is unavailable the system falls back to bounding-box area ratio.
 |----------|--------|-------------|
 | `/ws` | WS | Main WebSocket — frames in, commands out |
 | `/status` | GET | Latest snapshot: FPS, detections, tier |
-| `/frame` | GET | Latest JPEG frame (used by ttc.py) |
 | `/dashboard` | GET | Live HTML dashboard |
 | `/metrics` | GET | Prometheus metrics |
 | `/fall` | POST | Fall event from phone; triggers Twilio SMS if configured |
-| `/ttc` | POST | Closing-speed estimate from ttc.py |
 
 ---
 
@@ -214,16 +211,6 @@ Scan the QR code with Expo Go. First bundle takes ~60 s.
 ---
 
 ## Optional Sidecars
-
-### Time-to-Collision Estimator
-
-```powershell
-cd tools
-pip install opencv-python numpy requests
-python ttc.py
-```
-
-Polls `/frame`, runs Farneback optical flow, and POSTs closing speed to `/ttc`.
 
 ### Emergency SMS on Fall
 
