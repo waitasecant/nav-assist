@@ -63,6 +63,7 @@ docs/
 *.pt
 *.db
 *.html
+*.apk
 server/lib/
 model/
 recordings/
