@@ -136,8 +136,20 @@ jobs:
       - name: Install dependencies
         run: cd client && npm ci
 
+      - name: Create dist directory
+        run: mkdir -p dist
+
       - name: Build APK via EAS
-        run: cd client && npx eas-cli build --platform android --profile preview --non-interactive --output ../dist/navassist.apk
+        run: |
+          set -euo pipefail
+          cd client
+          BUILD_JSON=$(npx eas-cli build --platform android --profile preview --non-interactive --json)
+          BUILD_ID=$(echo "$BUILD_JSON" | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); const r=JSON.parse(d); console.log((Array.isArray(r)?r[0]:r).id)")
+          if [ -z "$BUILD_ID" ] || [ "$BUILD_ID" = "null" ]; then
+            echo "Failed to extract build id. EAS output:"; echo "$BUILD_JSON"; exit 1
+          fi
+          npx eas-cli build:download --platform android --id "$BUILD_ID" --output ../dist/navassist.apk
+          [ -f ../dist/navassist.apk ] || { echo "APK not found after download"; exit 1; }
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
