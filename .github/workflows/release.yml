@@ -121,9 +121,35 @@ jobs:
           name: navassist-server-${{ matrix.goos }}-${{ matrix.goarch }}
           path: navassist-server-${{ matrix.goos }}-${{ matrix.goarch }}.zip
 
+  apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: cd client && npm ci
+
+      - name: Build APK via EAS
+        run: cd client && npx eas-cli build --platform android --profile preview --non-interactive --output ../dist/navassist.apk
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: navassist-apk
+          path: dist/navassist.apk
+
   publish:
     name: Publish GitHub Release
-    needs: server
+    needs: [server, apk]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -159,5 +185,6 @@ jobs:
             For USB/developer mode: leave *Server IP* blank in the app settings.
           files: |
             artifacts/**/*.zip
+            artifacts/navassist-apk/navassist.apk
             model/yolov8n.onnx
             model/midas_small.onnx
