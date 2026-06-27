@@ -146,11 +146,17 @@ jobs:
           npx eas-cli whoami || { echo "EXPO_TOKEN invalid or not set"; exit 1; }
           [ -f eas.json ] || [ -d .eas ] || { echo "EAS not initialised — run 'eas init' in client/ and commit .eas/"; exit 1; }
           BUILD_JSON=$(npx eas-cli build --platform android --profile preview --non-interactive --json)
-          BUILD_ID=$(echo "$BUILD_JSON" | node -e "const d=require('fs').readFileSync('/dev/stdin','utf8'); const r=JSON.parse(d); console.log((Array.isArray(r)?r[0]:r).id)")
-          if [ -z "$BUILD_ID" ] || [ "$BUILD_ID" = "null" ]; then
-            echo "Failed to extract build id. EAS output:"; echo "$BUILD_JSON"; exit 1
+          APK_URL=$(echo "$BUILD_JSON" | node -e "
+            const d=require('fs').readFileSync('/dev/stdin','utf8');
+            const r=JSON.parse(d);
+            const b=Array.isArray(r)?r[0]:r;
+            console.log(b.artifacts?.buildUrl || b.artifact?.url || '');
+          ")
+          if [ -z "$APK_URL" ]; then
+            echo "Could not extract APK URL. EAS output:"; echo "$BUILD_JSON"; exit 1
           fi
-          npx eas-cli build:download --platform android --id "$BUILD_ID" --path ../dist/navassist.apk
+          echo "Downloading APK from: $APK_URL"
+          curl -fsSL "$APK_URL" -o ../dist/navassist.apk
           [ -f ../dist/navassist.apk ] || { echo "APK not found after download"; exit 1; }
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
