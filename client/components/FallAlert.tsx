@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
-import * as Haptics from "expo-haptics";
-import * as Speech from "expo-speech";
 
 const COUNTDOWN_S = 5;
 
@@ -16,9 +14,7 @@ export function FallAlert({ onDismiss, onUnacknowledged }: Props) {
   useEffect(() => {
     if (countdown <= 0) {
       onUnacknowledged?.();
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Speech.speak("Fall detected. Are you okay?", { rate: 1.0, language: "en" });
-      setCountdown(COUNTDOWN_S);
+      onDismiss();
       return;
     }
 

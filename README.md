@@ -28,7 +28,6 @@ graph LR
     end
 
     subgraph Tools [Sidecar Tools]
-        LLM[llm.py Phi-3-mini]
         TTC[ttc.py Optical Flow]
         ANA[analysis.py Report]
     end
@@ -41,7 +40,6 @@ graph LR
     CFG -->|confidence / thresholds via WebSocket| CMD
     CMD --> LOG
     CMD --> DASH
-    LLM -->|/narration POST every 5 s| CMD
     TTC -->|/ttc POST closing speed| CMD
     LOG -->|session.db| ANA
 ```
@@ -51,7 +49,6 @@ graph LR
 - The laptop sends a `commands` payload back — `vibrate` and/or `speak` — executed by the phone via `expo-haptics` and `expo-speech`.
 - The phone independently detects falls from IMU data and POSTs to `/fall`; the server can trigger an emergency SMS via Twilio.
 - A live web dashboard at `http://localhost:8000/dashboard` shows bounding boxes, FPS, and tier badges.
-- An optional Phi-3-mini sidecar generates spoken scene summaries every 5 s.
 
 ### Hazard Tiers
 
@@ -111,7 +108,6 @@ When MiDaS is unavailable the system falls back to bounding-box area ratio.
 │       └── PermissionScreen.tsx    # Camera permission prompt
 └── tools/
     ├── export.py                   # YOLOv8 -> ONNX export
-    ├── llm.py                      # Phi-3-mini scene narrator sidecar
     ├── ttc.py                      # Time-to-collision via optical flow
     ├── analysis.py                 # Post-session HTML report + heatmap
     ├── report_template.html        # Report template
@@ -130,7 +126,6 @@ When MiDaS is unavailable the system falls back to bounding-box area ratio.
 | `/dashboard` | GET | Live HTML dashboard |
 | `/metrics` | GET | Prometheus metrics |
 | `/fall` | POST | Fall event from phone; triggers Twilio SMS if configured |
-| `/narration` | POST | LLM-generated scene text; forwarded to phone TTS |
 | `/ttc` | POST | Closing-speed estimate from ttc.py |
 
 ---
@@ -220,20 +215,6 @@ Scan the QR code with Expo Go. First bundle takes ~60 s.
 
 ## Optional Sidecars
 
-### LLM Scene Narration
-
-Requires a Phi-3-mini GGUF from [HuggingFace](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf).
-
-```powershell
-cd tools
-pip install llama-cpp-python requests
-python llm.py --model path\to\Phi-3-mini.gguf
-```
-
-Every 5 s it fetches `/status`, generates a spoken sentence, and POSTs to `/narration`. The phone speaks it aloud.
-
-Optional flags: `--server http://localhost:8000`, `--interval 5.0`, `--threads 4`
-
 ### Time-to-Collision Estimator
 
 ```powershell
@@ -298,7 +279,6 @@ go run .\cmd\replay\ -dir ..\recordings\session1
 | Haptics | `expo-haptics` |
 | TTS | `expo-speech` |
 | Config persistence | `expo-sqlite`, `AsyncStorage` |
-| LLM narration | Phi-3-mini via `llama-cpp-python` (optional) |
 | Optical flow | OpenCV Farneback (optional) |
 | Analysis | SQLite + folium heatmap |
 | Build toolchain | MinGW gcc, Go 1.22 |
