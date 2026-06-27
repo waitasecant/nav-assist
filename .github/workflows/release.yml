@@ -19,25 +19,25 @@ jobs:
             goos: linux
             goarch: amd64
             ort_archive: onnxruntime-linux-x64-$ORT_VERSION.tgz
-            ort_lib_src: lib/libonnxruntime.so.$ORT_VERSION
             ort_lib_dst: lib/libonnxruntime.so
             default_ort_lib: lib/libonnxruntime.so
+            cc: ""
             ext: ""
           - runner: ubuntu-latest
             goos: linux
             goarch: arm64
             ort_archive: onnxruntime-linux-aarch64-$ORT_VERSION.tgz
-            ort_lib_src: lib/libonnxruntime.so.$ORT_VERSION
             ort_lib_dst: lib/libonnxruntime.so
             default_ort_lib: lib/libonnxruntime.so
+            cc: aarch64-linux-gnu-gcc
             ext: ""
           - runner: windows-latest
             goos: windows
             goarch: amd64
             ort_archive: onnxruntime-win-x64-$ORT_VERSION.zip
-            ort_lib_src: lib/onnxruntime.dll
             ort_lib_dst: lib/onnxruntime.dll
             default_ort_lib: lib/onnxruntime.dll
+            cc: ""
             ext: ".exe"
 
     steps:
@@ -47,6 +47,10 @@ jobs:
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
+
+      - name: Install C cross-compiler (arm64 only)
+        if: matrix.cc != ''
+        run: sudo apt-get install -y gcc-aarch64-linux-gnu
 
       - name: Download OnnxRuntime library
         shell: bash
@@ -69,7 +73,8 @@ jobs:
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: "0"
+          CGO_ENABLED: "1"
+          CC: ${{ matrix.cc }}
         run: |
           REPO="${{ github.repository }}"
           RELEASE_BASE="https://github.com/${REPO}/releases/latest/download"
