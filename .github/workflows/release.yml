@@ -59,14 +59,23 @@ jobs:
           ARCHIVE="${{ matrix.ort_archive }}"
           ARCHIVE="${ARCHIVE/\$ORT_VERSION/${ORT_VERSION}}"
           curl -fsSL "${ORT_BASE}/${ARCHIVE}" -o ort.archive
-          mkdir -p dist/lib
+          mkdir -p /tmp/ort dist/lib
+
+          # Extract to temp dir to avoid wildcard/strip-component guesswork.
           if [[ "${ARCHIVE}" == *.zip ]]; then
-            unzip -j ort.archive "*/onnxruntime.dll" -d dist/lib/
+            unzip -q ort.archive -d /tmp/ort
+            find /tmp/ort -name "onnxruntime.dll" | head -1 | xargs -I{} cp {} dist/lib/onnxruntime.dll
           else
-            tar -xzf ort.archive --wildcards "*/libonnxruntime.so.*" --strip-components=2 -C dist/lib/
-            # normalise versioned soname to plain name
-            find dist/lib -name "libonnxruntime.so.*" | head -1 | xargs -I{} cp {} dist/lib/libonnxruntime.so
+            tar -xzf ort.archive -C /tmp/ort
+            # Pick the versioned .so, skip providers libs.
+            find /tmp/ort -name "libonnxruntime.so.*" ! -name "*providers*" | head -1 \
+              | xargs -I{} cp {} dist/lib/libonnxruntime.so
           fi
+
+          echo "--- dist/lib contents ---"
+          ls -lh dist/lib/
+          # Fail fast if nothing was extracted.
+          [ "$(ls -A dist/lib)" ] || { echo "ERROR: ORT lib not found in archive"; exit 1; }
 
       - name: Build server binary
         shell: bash
