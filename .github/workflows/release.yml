@@ -150,7 +150,7 @@ jobs:
           if [ -z "$BUILD_ID" ] || [ "$BUILD_ID" = "null" ]; then
             echo "Failed to extract build id. EAS output:"; echo "$BUILD_JSON"; exit 1
           fi
-          npx eas-cli build:download --platform android --id "$BUILD_ID" --output ../dist/navassist.apk
+          npx eas-cli build:download --platform android --id "$BUILD_ID" --path ../dist/navassist.apk
           [ -f ../dist/navassist.apk ] || { echo "APK not found after download"; exit 1; }
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
