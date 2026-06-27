@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { CameraView } from "expo-camera";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
