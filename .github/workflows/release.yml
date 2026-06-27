@@ -1,0 +1,145 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+# ORT version must match what yalue/onnxruntime_go expects.
+env:
+  ORT_VERSION: "1.20.1"
+
+jobs:
+  server:
+    name: Build server (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            ort_archive: onnxruntime-linux-x64-$ORT_VERSION.tgz
+            ort_lib_src: lib/libonnxruntime.so.$ORT_VERSION
+            ort_lib_dst: lib/libonnxruntime.so
+            default_ort_lib: lib/libonnxruntime.so
+            ext: ""
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            ort_archive: onnxruntime-linux-aarch64-$ORT_VERSION.tgz
+            ort_lib_src: lib/libonnxruntime.so.$ORT_VERSION
+            ort_lib_dst: lib/libonnxruntime.so
+            default_ort_lib: lib/libonnxruntime.so
+            ext: ""
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
+            ort_archive: onnxruntime-win-x64-$ORT_VERSION.zip
+            ort_lib_src: lib/onnxruntime.dll
+            ort_lib_dst: lib/onnxruntime.dll
+            default_ort_lib: lib/onnxruntime.dll
+            ext: ".exe"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Download OnnxRuntime library
+        shell: bash
+        run: |
+          ORT_BASE="https://github.com/microsoft/onnxruntime/releases/download/v${ORT_VERSION}"
+          ARCHIVE="${{ matrix.ort_archive }}"
+          ARCHIVE="${ARCHIVE/\$ORT_VERSION/${ORT_VERSION}}"
+          curl -fsSL "${ORT_BASE}/${ARCHIVE}" -o ort.archive
+          mkdir -p dist/lib
+          if [[ "${ARCHIVE}" == *.zip ]]; then
+            unzip -j ort.archive "*/onnxruntime.dll" -d dist/lib/
+          else
+            tar -xzf ort.archive --wildcards "*/libonnxruntime.so.*" --strip-components=2 -C dist/lib/
+            # normalise versioned soname to plain name
+            find dist/lib -name "libonnxruntime.so.*" | head -1 | xargs -I{} cp {} dist/lib/libonnxruntime.so
+          fi
+
+      - name: Build server binary
+        shell: bash
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          REPO="${{ github.repository }}"
+          RELEASE_BASE="https://github.com/${REPO}/releases/latest/download"
+          LDFLAGS="-X main.defaultOrtLib=${{ matrix.default_ort_lib }} -X main.releaseBase=${RELEASE_BASE}"
+          cd server
+          go build -ldflags="${LDFLAGS}" -o "../dist/navassist-server${{ matrix.ext }}" ./cmd/server
+
+      - name: Package release bundle
+        shell: bash
+        run: |
+          NAME="navassist-server-${{ matrix.goos }}-${{ matrix.goarch }}"
+          mkdir -p "release/${NAME}/lib"
+          cp dist/navassist-server${{ matrix.ext }} "release/${NAME}/"
+          cp dist/lib/* "release/${NAME}/lib/"
+          cat > "release/${NAME}/README.txt" <<'EOF'
+          NavAssist Server — Quick Start
+          ==============================
+          1. Run navassist-server (or navassist-server.exe on Windows).
+             Models are downloaded automatically on first launch (~35 MB).
+          2. Install the NavAssist APK from this release on your Android phone.
+          3. Both devices must be on the same Wi-Fi network.
+             The app will discover the server automatically via mDNS,
+             or scan the QR code printed in the terminal.
+          4. For USB / developer mode: leave "Server IP" blank in app settings.
+          EOF
+          cd release && zip -r "../${NAME}.zip" "${NAME}"
+
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: navassist-server-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: navassist-server-${{ matrix.goos }}-${{ matrix.goarch }}.zip
+
+  publish:
+    name: Publish GitHub Release
+    needs: server
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all server bundles
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Export ONNX models
+        run: |
+          pip install --quiet ultralytics onnx onnxslim onnxruntime numpy
+          python tools/export.py
+          python tools/smoke_test.py
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "NavAssist ${{ github.ref_name }}"
+          body: |
+            ## Installation
+
+            **Server** — download the bundle for your OS, unzip, run `navassist-server`.
+            Models are downloaded automatically on first launch (~35 MB).
+
+            **Phone** — sideload `navassist.apk` (enable *Install from unknown sources*).
+
+            Both must be on the same Wi-Fi network. The app discovers the server via mDNS
+            or you can scan the QR code printed in the server terminal.
+
+            For USB/developer mode: leave *Server IP* blank in the app settings.
+          files: |
+            artifacts/**/*.zip
+            model/yolov8n.onnx
+            model/midas_small.onnx

@@ -6,6 +6,7 @@ export interface AppConfig {
   immClose: number;   // depth closeness for IMMEDIATE 0.5–0.95
   cautClose: number;  // depth closeness for CAUTION 0.2–0.7
   ttsRate: number;    // TTS speech rate 0.5–2.0
+  serverIP: string;   // empty = localhost (USB); set to Wi-Fi IP for wireless
 }
 
 const DEFAULTS: AppConfig = {
@@ -13,6 +14,7 @@ const DEFAULTS: AppConfig = {
   immClose: 0.75,
   cautClose: 0.45,
   ttsRate: 1.1,
+  serverIP: "",
 };
 
 const KEY = "navassist_config_v1";

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
@@ -9,6 +10,7 @@ import (
 	"image/jpeg"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +20,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/grandcat/zeroconf"
+	"github.com/mdp/qrterminal/v3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	ort "github.com/yalue/onnxruntime_go"
 
@@ -26,6 +30,12 @@ import (
 	"navassist/internal/inference"
 	"navassist/internal/logger"
 	"navassist/internal/metrics"
+)
+
+// defaultOrtLib and releaseBase are overridden at build time via -ldflags.
+var (
+	defaultOrtLib = "lib/onnxruntime.dll"
+	releaseBase   = ""
 )
 
 type config struct {
@@ -41,12 +51,58 @@ func parseConfig() config {
 	var cfg config
 	flag.StringVar(&cfg.modelPath,      "model",       "../model/yolov8n.onnx",     "path to yolov8n.onnx")
 	flag.StringVar(&cfg.depthModelPath, "depth-model", "../model/midas_small.onnx", "path to MiDaS ONNX")
-	flag.StringVar(&cfg.ortLib,         "ort",         "lib/onnxruntime.dll",       "path to ORT shared library")
+	flag.StringVar(&cfg.ortLib,         "ort",         defaultOrtLib,               "path to ORT shared library")
 	flag.StringVar(&cfg.port,           "port",        "8000",                      "listen port")
 	flag.StringVar(&cfg.logPath,        "log",         "session.db",                "path to SQLite session log")
 	flag.StringVar(&cfg.recordDir,      "record",      "",                          "directory for frame recordings (empty = disabled)")
 	flag.Parse()
 	return cfg
+}
+
+// ensureModel downloads the file at downloadURL to dst if dst does not exist.
+// If downloadURL is empty, it returns an error when the file is missing.
+func ensureModel(dst, downloadURL string) error {
+	if _, err := os.Stat(dst); err == nil {
+		return nil
+	}
+	if downloadURL == "" {
+		return fmt.Errorf("model not found at %s (set -release-base or copy the file manually)", dst)
+	}
+	slog.Info("downloading model", "dst", dst, "url", downloadURL)
+	resp, err := http.Get(downloadURL) //nolint:noctx
+	if err != nil {
+		return fmt.Errorf("download %s: %w", downloadURL, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("download %s: HTTP %d", downloadURL, resp.StatusCode)
+	}
+	if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
+		return err
+	}
+	f, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = io.Copy(f, resp.Body)
+	return err
+}
+
+// localIP returns the first non-loopback IPv4 address, or "localhost".
+func localIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "localhost"
+	}
+	for _, a := range addrs {
+		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+			if v4 := ipnet.IP.To4(); v4 != nil {
+				return v4.String()
+			}
+		}
+	}
+	return "localhost"
 }
 
 var upgrader = websocket.Upgrader{
@@ -130,6 +186,15 @@ func updateLatest(fps float32, count int64, dets []inference.Detection) {
 func main() {
 	cfg := parseConfig()
 
+	// Auto-download models from release if missing.
+	if releaseBase != "" {
+		if err := ensureModel(cfg.modelPath, releaseBase+"/yolov8n.onnx"); err != nil {
+			slog.Error("model unavailable", "err", err)
+			return
+		}
+		_ = ensureModel(cfg.depthModelPath, releaseBase+"/midas_small.onnx")
+	}
+
 	ort.SetSharedLibraryPath(cfg.ortLib)
 	if err := ort.InitializeEnvironment(); err != nil {
 		slog.Error("ort init failed", "err", err)
@@ -177,7 +242,36 @@ func main() {
 	http.HandleFunc("/dashboard", dashboardHandler)
 	http.HandleFunc("/fall", fallHandler)
 	http.HandleFunc("/frame", frameHandler)
+
+	// Advertise via mDNS so phones on the same LAN can discover the server.
+	port, _ := fmt.Sscanf(cfg.port, "%d")
+	_ = port
+	var portNum int
+	fmt.Sscanf(cfg.port, "%d", &portNum)
+	mdns, err := zeroconf.Register("NavAssist", "_navassist._tcp", "local.", portNum, []string{"txtv=0"}, nil)
+	if err != nil {
+		slog.Warn("mDNS registration failed", "err", err)
+	} else {
+		defer mdns.Shutdown()
+		slog.Info("mDNS registered", "service", "_navassist._tcp.local")
+	}
+
+	// Print server URL as QR code so the phone can connect without typing an IP.
+	ip := localIP()
+	wsURL := fmt.Sprintf("navassist://%s:%s", ip, cfg.port)
+	fmt.Printf("\nScan to connect (Wi-Fi only — USB uses localhost):\n")
+	qrterminal.GenerateWithConfig(wsURL, qrterminal.Config{
+		Level:     qrterminal.L,
+		Writer:    os.Stdout,
+		BlackChar: qrterminal.BLACK,
+		WhiteChar: qrterminal.WHITE,
+	})
+	fmt.Printf("\n  %s\n\n", wsURL)
+
 	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	_ = ctx
 	if err := http.ListenAndServe(":"+cfg.port, nil); err != nil {
 		slog.Error("server failed", "err", err)
 	}

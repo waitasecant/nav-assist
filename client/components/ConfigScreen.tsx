@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { AppConfig } from "../hooks/useConfig";
 
 interface Props {
@@ -45,6 +45,19 @@ export function ConfigScreen({ config, onChange, onClose }: Props) {
           onDec={() => onChange({ ttsRate: round(Math.max(0.5, config.ttsRate - 0.1)) })}
           onInc={() => onChange({ ttsRate: round(Math.min(2.0, config.ttsRate + 0.1)) })}
         />
+
+        <View style={styles.row}>
+          <Text style={styles.label}>Server IP (empty = USB / localhost)</Text>
+          <TextInput
+            style={styles.ipInput}
+            value={config.serverIP}
+            onChangeText={(text) => onChange({ serverIP: text.trim() })}
+            placeholder="e.g. 192.168.1.42"
+            placeholderTextColor="#555"
+            keyboardType="numeric"
+            autoCorrect={false}
+          />
+        </View>
 
         <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
           <Text style={styles.closeTxt}>Done</Text>
@@ -111,4 +124,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   closeTxt: { color: "#000", fontSize: 18, fontWeight: "bold" },
+  ipInput: {
+    backgroundColor: "#222",
+    color: "#fff",
+    fontSize: 16,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#444",
+  },
 });

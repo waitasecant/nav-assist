@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { PC_IP, WS_PORT } from "../hooks/useStreamer";
+import { WS_PORT } from "../hooks/useStreamer";
 
 interface Props {
   status: string;
@@ -16,7 +16,7 @@ export function StatsOverlay({ status, latency, fps, frameCount, hazard, accelMa
   return (
     <View style={styles.container}>
       <Text style={styles.title}>NavAssist</Text>
-      <StatRow label="Server" value={`${PC_IP}:${WS_PORT}`} />
+      <StatRow label="Port" value={`${WS_PORT}`} />
       <StatRow label="Status" value={status} />
       <StatRow label="RTT Latency" value={latency != null ? `${latency} ms` : "-"} />
       <StatRow label="FPS" value={String(fps)} />

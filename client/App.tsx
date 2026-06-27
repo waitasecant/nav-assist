@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState } from "react";
 import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
-import { useStreamer, PC_IP, WS_PORT } from "./hooks/useStreamer";
+import { useStreamer, WS_PORT, resolveHost } from "./hooks/useStreamer";
 import { useFallDetector } from "./hooks/useFallDetector";
 import { useSessionLog } from "./hooks/useSessionLog";
 import { useConfig } from "./hooks/useConfig";
@@ -30,9 +30,10 @@ export default function App() {
   }, []);
 
   const handleUnacknowledged = async () => {
+    const host = resolveHost(config.serverIP);
     try {
       const loc = await Location.getLastKnownPositionAsync();
-      await fetch(`http://${PC_IP}:${WS_PORT}/fall`, {
+      await fetch(`http://${host}:${WS_PORT}/fall`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

@@ -5,11 +5,14 @@ import * as Speech from "expo-speech";
 import { AppConfig } from "./useConfig";
 
 // Config
-const PC_IP = "localhost";
 const WS_PORT = 8000;
-const FRAME_INTERVAL_MS = 100;
 
-export { PC_IP, WS_PORT };
+export { WS_PORT };
+
+// resolveHost returns the server host: config.serverIP if set, else localhost.
+export function resolveHost(serverIP: string): string {
+  return serverIP.trim() || "localhost";
+}
 
 interface Stats {
   status: string;
@@ -63,7 +66,7 @@ export function useStreamer(
         }
       }
 
-      setTimeout(capture, FRAME_INTERVAL_MS);
+      setTimeout(capture, 100);
     };
 
     capture();
@@ -74,7 +77,8 @@ export function useStreamer(
   const connect = useCallback(() => {
     setStats((s) => ({ ...s, status: "Connecting…" }));
 
-    const ws = new WebSocket(`ws://${PC_IP}:${WS_PORT}/ws`);
+    const host = resolveHost(config.serverIP);
+    const ws = new WebSocket(`ws://${host}:${WS_PORT}/ws`);
     wsRef.current = ws;
 
     ws.onopen = () => {
