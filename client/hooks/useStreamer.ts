@@ -60,10 +60,14 @@ export function useStreamer(
       if (cameraRef.current && ws?.readyState === WebSocket.OPEN) {
         camLoggedRef.current = false;
         try {
-          const photo = await cameraRef.current.takePictureAsync({
-            quality: 0.3,
-            base64: true,
-          });
+          console.log("[capture] calling takePictureAsync");
+          const photo = await Promise.race([
+            cameraRef.current.takePictureAsync({ quality: 0.3, base64: true }),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("takePictureAsync timed out")), 3000)
+            ),
+          ]);
+          console.log("[capture] photo received");
 
           if (photo?.base64 && ws.readyState === WebSocket.OPEN) {
             if (frameCountRef.current === 0) console.log("[capture] first frame sent");
