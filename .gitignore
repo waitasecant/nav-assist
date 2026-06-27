@@ -61,5 +61,8 @@ docs/
 *.dll
 *.exe
 *.pt
+*.db
+*.html
 server/lib/
 model/
+recordings/

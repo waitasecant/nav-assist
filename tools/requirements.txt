@@ -2,3 +2,8 @@
 ultralytics>=8.0.0
 onnx==1.22.0
 onnxslim==0.1.94
+
+# Session analysis and TTC
+folium>=0.17.0
+opencv-python>=4.9.0
+numpy>=1.26.0

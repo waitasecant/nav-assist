@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>NavAssist Dashboard</title>
+<style>
+  body{background:#111;color:#ddd;font-family:monospace;padding:24px;margin:0}
+  h1{color:#4af;margin-bottom:20px}
+  .stats{display:flex;gap:20px;margin-bottom:20px;flex-wrap:wrap}
+  .stat{background:#1a1a1a;padding:12px 20px;border-radius:8px;min-width:80px}
+  .sv{font-size:28px;font-weight:bold;color:#fff}
+  .sl{font-size:12px;color:#888;margin-top:4px}
+  .tier{font-size:28px;font-weight:bold;padding:8px 18px;border-radius:8px;display:inline-block;margin-bottom:20px}
+  .IMMEDIATE{background:#a00;color:#fff}
+  .CAUTION{background:#850;color:#fff}
+  .AWARE{background:#444;color:#ddd}
+  .CLEAR{background:#040;color:#8f8}
+  table{border-collapse:collapse;width:100%}
+  th,td{border:1px solid #333;padding:8px 12px;text-align:left}
+  th{background:#222;color:#4af}
+</style>
+</head>
+<body>
+<h1>NavAssist</h1>
+<div class="stats">
+  <div class="stat"><div class="sv" id="fps">—</div><div class="sl">FPS</div></div>
+  <div class="stat"><div class="sv" id="frames">—</div><div class="sl">Frames</div></div>
+  <div class="stat"><div class="sv" id="age">—</div><div class="sl">Updated</div></div>
+</div>
+<div id="tier" class="tier CLEAR">CLEAR</div>
+<table>
+  <thead><tr><th>Label</th><th>Conf</th><th>Closeness</th><th>Tier</th></tr></thead>
+  <tbody id="tbody"></tbody>
+</table>
+<script>
+async function poll(){
+  try{
+    const d=await(await fetch('/status')).json();
+    document.getElementById('fps').textContent=d.fps.toFixed(1);
+    document.getElementById('frames').textContent=d.frame_count;
+    const ms=Date.now()-d.updated_at;
+    document.getElementById('age').textContent=ms<2000?'live':(ms/1000).toFixed(0)+'s ago';
+    const t=document.getElementById('tier');
+    t.textContent=d.tier;t.className='tier '+d.tier;
+    document.getElementById('tbody').innerHTML=(d.detections||[]).map(x=>
+      '<tr><td>'+x.label+'</td><td>'+(x.conf*100).toFixed(0)+'%</td><td>'+
+      (x.depth>=0?(x.depth*100).toFixed(0)+'%':'—')+'</td><td>'+x.tier+'</td></tr>'
+    ).join('');
+  }catch(e){}
+  setTimeout(poll,1000);
+}
+poll();
+</script>
+</body>
+</html>

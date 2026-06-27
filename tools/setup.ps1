@@ -26,3 +26,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Remove-Item "yolov8n.pt" -ErrorAction SilentlyContinue
 Write-Host "Done." -ForegroundColor Green
+Write-Host ""
+Write-Host "To run tools in future terminals, activate the venv first:" -ForegroundColor Yellow
+Write-Host "  cd tools" -ForegroundColor Yellow
+Write-Host "  . .\venv\Scripts\Activate.ps1" -ForegroundColor Yellow
