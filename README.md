@@ -125,6 +125,39 @@ When MiDaS is unavailable the system falls back to bounding-box area ratio.
 
 ---
 
+## Releases
+
+Each `v*` tag triggers a GitHub Actions release that publishes pre-built artifacts — no Go toolchain or EAS account needed to run the system.
+
+| Artifact | Use |
+|----------|-----|
+| `navassist-server-linux-amd64.zip` | Laptop (Linux x64) — unzip, run binary |
+| `navassist-server-linux-arm64.zip` | Raspberry Pi 4/5 — server on the Pi, phone on Wi-Fi |
+| `navassist-server-windows-amd64.zip` | Laptop (Windows) — unzip, run binary |
+| `navassist.apk` | Sideload directly onto phone |
+| `yolov8n.onnx`, `midas_small.onnx` | Auto-downloaded by the server on first launch |
+
+### Quick start (no source required)
+
+Go to the [latest release](https://github.com/waitasecant/nav-assist/releases/latest) and download:
+- The server bundle for your platform (e.g. `navassist-server-windows-amd64.zip`)
+- `navassist.apk`
+
+```powershell
+# 1. Unzip server bundle and run — models download automatically (~35 MB)
+.\navassist-server.exe
+
+# 2. Install APK onto phone
+adb install navassist.apk
+
+# 3. Tunnel USB port (re-run after every USB reconnect)
+adb reverse tcp:8000 tcp:8000
+
+# 4. Open the app — grant camera permission when prompted, leave "Server IP" blank
+```
+
+---
+
 ## Prerequisites
 
 | Requirement | Notes |
