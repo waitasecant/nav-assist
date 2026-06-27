@@ -33,7 +33,6 @@ export function useStreamer(
   const frameCountRef = useRef(0);
   const streamingRef = useRef(false);
   const configRef = useRef(config);
-  const camLoggedRef = useRef(false);
   useEffect(() => { configRef.current = config; }, [config]);
 
   const [stats, setStats] = useState<Stats>({
@@ -45,44 +44,30 @@ export function useStreamer(
   });
 
   const startCapture = useCallback(() => {
-    if (streamingRef.current) {
-      console.log("[capture] already streaming, skip");
-      return;
-    }
+    if (streamingRef.current) return;
     streamingRef.current = true;
-    camLoggedRef.current = false;
-    console.log("[capture] loop started");
 
     const capture = async () => {
       if (!streamingRef.current) return;
 
       const ws = wsRef.current;
       if (cameraRef.current && ws?.readyState === WebSocket.OPEN) {
-        camLoggedRef.current = false;
         try {
-          console.log("[capture] calling takePictureAsync");
           const photo = await Promise.race([
             cameraRef.current.takePictureAsync({ quality: 0.3, base64: true }),
             new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("takePictureAsync timed out")), 3000)
+              setTimeout(() => reject(new Error("camera timeout")), 3000)
             ),
           ]);
-          console.log("[capture] photo received");
 
           if (photo?.base64 && ws.readyState === WebSocket.OPEN) {
-            if (frameCountRef.current === 0) console.log("[capture] first frame sent");
             lastSentAtRef.current = Date.now();
             ws.send(JSON.stringify({ ts: lastSentAtRef.current, frame: photo.base64 }));
             frameCountRef.current++;
-          } else {
-            console.warn(`[capture] photo null or ws closed: base64=${!!photo?.base64} ws=${ws.readyState}`);
           }
-        } catch (e) {
-          console.error(`[camera] takePictureAsync failed: ${e}`);
+        } catch (_) {
+          // camera not ready or timed out - skip frame
         }
-      } else if (!camLoggedRef.current) {
-        camLoggedRef.current = true;
-        console.log(`[capture] waiting: ref=${!!cameraRef.current} ws=${ws?.readyState}`);
       }
 
       setTimeout(capture, 100);
@@ -97,13 +82,11 @@ export function useStreamer(
     setStats((s) => ({ ...s, status: "Connecting…" }));
 
     const host = resolveHost(configRef.current.serverIP);
-    console.log(`[ws] connecting to ws://${host}:${WS_PORT}/ws`);
     const ws = new WebSocket(`ws://${host}:${WS_PORT}/ws`);
     wsRef.current = ws;
 
     ws.onopen = () => {
       retryDelayRef.current = 1000;
-      console.log("[ws] opened, calling startCapture");
       setStats((s) => ({ ...s, status: "Connected ✓" }));
       ws.send(JSON.stringify({
         type: "config",
@@ -116,15 +99,13 @@ export function useStreamer(
 
     ws.onclose = (event) => {
       streamingRef.current = false;
-      console.log(`[ws] closed: code=${event.code} reason=${event.reason} clean=${event.wasClean}`);
       const delay = retryDelayRef.current;
       retryDelayRef.current = Math.min(delay * 2, 30000);
       setStats((s) => ({ ...s, status: `Disconnected - retrying in ${delay / 1000}s` }));
       setTimeout(connect, delay);
     };
 
-    ws.onerror = (event) => {
-      console.error(`[ws] error: ${JSON.stringify(event)}`);
+    ws.onerror = () => {
       setStats((s) => ({ ...s, status: "Connection error" }));
     };
 
