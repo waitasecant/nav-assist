@@ -109,7 +109,11 @@ jobs:
              or scan the QR code printed in the terminal.
           4. For USB / developer mode: leave "Server IP" blank in app settings.
           EOF
-          cd release && zip -r "../${NAME}.zip" "${NAME}"
+          if [[ "${{ matrix.goos }}" == "windows" ]]; then
+            powershell -Command "Compress-Archive -Path 'release/${NAME}' -DestinationPath '${NAME}.zip' -Force"
+          else
+            cd release && zip -r "../${NAME}.zip" "${NAME}"
+          fi
 
       - name: Upload bundle artifact
         uses: actions/upload-artifact@v4
