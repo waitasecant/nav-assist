@@ -9,8 +9,6 @@ jobs:
   export:
     name: Export ONNX models & publish release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -35,11 +33,3 @@ jobs:
           name: onnx-models-${{ github.run_id }}
           path: model/yolov8n.onnx
           retention-days: 30
-
-      - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: models-${{ github.run_number }}
-          name: "Model export ${{ github.run_number }}"
-          body: "Automated nightly ONNX export. Smoke test passed."
-          files: model/yolov8n.onnx
