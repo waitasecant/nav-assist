@@ -320,10 +320,10 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 		defer close(done)
 
 		conn.SetPongHandler(func(string) error {
-			conn.SetReadDeadline(time.Now().Add(pingInterval + pongWait))
+			_ = conn.SetReadDeadline(time.Now().Add(pingInterval + pongWait))
 			return nil
 		})
-		conn.SetReadDeadline(time.Now().Add(pingInterval + pongWait))
+		_ = conn.SetReadDeadline(time.Now().Add(pingInterval + pongWait))
 
 		var writeMu sync.Mutex
 
