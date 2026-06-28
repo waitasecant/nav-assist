@@ -21,6 +21,7 @@ interface Stats {
   fps: number;
   frameCount: number;
   hazard: string | null;
+  dropped: number;
 }
 
 export function useStreamer(
@@ -35,6 +36,10 @@ export function useStreamer(
   const inFlightRef = useRef(false);
   const lastMsgAtRef = useRef(0);
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const droppedCountRef = useRef(0);
+  const captureIntervalRef = useRef(100);
+  const jpegQualityRef = useRef(0.3);
+  const rttWindowRef = useRef<number[]>([]);
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
@@ -44,6 +49,7 @@ export function useStreamer(
     fps: 0,
     frameCount: 0,
     hazard: null,
+    dropped: 0,
   });
 
   const startCapture = useCallback(() => {
@@ -57,24 +63,28 @@ export function useStreamer(
       if (cameraRef.current && ws?.readyState === WebSocket.OPEN) {
         try {
           const photo = await Promise.race([
-            cameraRef.current.takePictureAsync({ quality: 0.3, base64: true }),
+            cameraRef.current.takePictureAsync({ quality: jpegQualityRef.current, base64: true }),
             new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error("camera timeout")), 3000)
             ),
           ]);
 
-          if (photo?.base64 && ws.readyState === WebSocket.OPEN && !inFlightRef.current) {
-            inFlightRef.current = true;
-            lastSentAtRef.current = Date.now();
-            ws.send(JSON.stringify({ ts: lastSentAtRef.current, frame: photo.base64 }));
-            frameCountRef.current++;
+          if (photo?.base64 && ws.readyState === WebSocket.OPEN) {
+            if (!inFlightRef.current) {
+              inFlightRef.current = true;
+              lastSentAtRef.current = Date.now();
+              ws.send(JSON.stringify({ ts: lastSentAtRef.current, frame: photo.base64 }));
+              frameCountRef.current++;
+            } else {
+              droppedCountRef.current++;
+            }
           }
         } catch (_) {
           // camera not ready or timed out - skip frame
         }
       }
 
-      setTimeout(capture, 100);
+      setTimeout(capture, captureIntervalRef.current);
     };
 
     capture();
@@ -110,6 +120,9 @@ export function useStreamer(
     ws.onclose = (_event) => {
       streamingRef.current = false;
       inFlightRef.current = false;
+      captureIntervalRef.current = 100;
+      jpegQualityRef.current = 0.3;
+      rttWindowRef.current = [];
       if (watchdogRef.current !== null) {
         clearInterval(watchdogRef.current);
         watchdogRef.current = null;
@@ -129,6 +142,12 @@ export function useStreamer(
       inFlightRef.current = false;
       lastMsgAtRef.current = Date.now();
       const rtt = Date.now() - lastSentAtRef.current;
+      const win = rttWindowRef.current;
+      win.push(rtt);
+      if (win.length > 3) win.shift();
+      const avgRtt = win.reduce((a, b) => a + b, 0) / win.length;
+      captureIntervalRef.current = avgRtt > 400 ? 500 : avgRtt > 150 ? 200 : 100;
+      jpegQualityRef.current = avgRtt > 400 ? 0.2 : 0.3;
       const msg = JSON.parse(event.data as string);
 
       const top = msg.detections?.[0] ?? null;
@@ -162,7 +181,9 @@ export function useStreamer(
     return setInterval(() => {
       const count = frameCountRef.current;
       frameCountRef.current = 0;
-      setStats((s) => ({ ...s, fps: count, frameCount: s.frameCount + count }));
+      const dropped = droppedCountRef.current;
+      droppedCountRef.current = 0;
+      setStats((s) => ({ ...s, fps: count, frameCount: s.frameCount + count, dropped }));
     }, 1000);
   }, []);
 
