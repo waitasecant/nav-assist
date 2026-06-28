@@ -38,7 +38,7 @@ func NewDepth(modelPath string) (*DepthModel, error) {
 
 	outTensor, err := ort.NewEmptyTensor[float32](outShape)
 	if err != nil {
-		inTensor.Destroy()
+		_ = inTensor.Destroy()
 		return nil, fmt.Errorf("depth output tensor: %w", err)
 	}
 
@@ -50,8 +50,8 @@ func NewDepth(modelPath string) (*DepthModel, error) {
 		nil,
 	)
 	if err != nil {
-		inTensor.Destroy()
-		outTensor.Destroy()
+		_ = inTensor.Destroy()
+		_ = outTensor.Destroy()
 		return nil, fmt.Errorf("create depth session: %w", err)
 	}
 
@@ -64,9 +64,9 @@ func NewDepth(modelPath string) (*DepthModel, error) {
 
 // Close releases all ORT resources.
 func (m *DepthModel) Close() {
-	m.session.Destroy()
-	m.inputTensor.Destroy()
-	m.outputTensor.Destroy()
+	_ = m.session.Destroy()
+	_ = m.inputTensor.Destroy()
+	_ = m.outputTensor.Destroy()
 }
 
 // Run returns a normalized closeness map (0=far, 1=closest) of size depthSize×depthSize.

@@ -44,10 +44,10 @@ func New(path string) (*Logger, error) {
 // LogEvent records a hazard detection. Errors are intentionally silenced to
 // keep the hot path clean.
 func (l *Logger) LogEvent(tier, label string, depth float32) {
-	l.stmt.Exec(time.Now().UnixMilli(), tier, label, depth)
+	_, _ = l.stmt.Exec(time.Now().UnixMilli(), tier, label, depth)
 }
 
 func (l *Logger) Close() {
-	l.stmt.Close()
-	l.db.Close()
+	_ = l.stmt.Close()
+	_ = l.db.Close()
 }

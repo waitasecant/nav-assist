@@ -167,7 +167,7 @@ func saveFrame(dir string, id int64, jpegData []byte, dets []inference.Detection
 	manifestMu.Lock()
 	f, err := os.OpenFile(filepath.Join(dir, "manifest.jsonl"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err == nil {
-		f.Write(append(b, '\n'))
+		_, _ = f.Write(append(b, '\n'))
 		f.Close()
 	}
 	manifestMu.Unlock()
@@ -200,7 +200,7 @@ func main() {
 		slog.Error("ort init failed", "err", err)
 		return
 	}
-	defer ort.DestroyEnvironment()
+	defer func() { _ = ort.DestroyEnvironment() }()
 
 	model, err := inference.New(cfg.modelPath)
 	if err != nil {
@@ -244,10 +244,8 @@ func main() {
 	http.HandleFunc("/frame", frameHandler)
 
 	// Advertise via mDNS so phones on the same LAN can discover the server.
-	port, _ := fmt.Sscanf(cfg.port, "%d")
-	_ = port
 	var portNum int
-	fmt.Sscanf(cfg.port, "%d", &portNum)
+	_, _ = fmt.Sscanf(cfg.port, "%d", &portNum)
 	mdns, err := zeroconf.Register("NavAssist", "_navassist._tcp", "local.", portNum, []string{"txtv=0"}, nil)
 	if err != nil {
 		slog.Warn("mDNS registration failed", "err", err)
@@ -304,6 +302,11 @@ func tierIcon(tier string) string {
 	}
 }
 
+const (
+	pingInterval = 10 * time.Second
+	pongWait     = 5 * time.Second
+)
+
 func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logger.Logger, recordDir string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
@@ -312,6 +315,35 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 			return
 		}
 		defer conn.Close()
+
+		done := make(chan struct{})
+		defer close(done)
+
+		conn.SetPongHandler(func(string) error {
+			conn.SetReadDeadline(time.Now().Add(pingInterval + pongWait))
+			return nil
+		})
+		conn.SetReadDeadline(time.Now().Add(pingInterval + pongWait))
+
+		var writeMu sync.Mutex
+
+		go func() {
+			ticker := time.NewTicker(pingInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					writeMu.Lock()
+					err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(pongWait))
+					writeMu.Unlock()
+					if err != nil {
+						return
+					}
+				case <-done:
+					return
+				}
+			}
+		}()
 
 		slog.Info("client connected", "remote", r.RemoteAddr)
 		start := time.Now()
@@ -398,7 +430,10 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 				Detections: dets,
 				Commands:   cmds,
 			}
-			if err := conn.WriteJSON(resp); err != nil {
+			writeMu.Lock()
+			writeErr := conn.WriteJSON(resp)
+			writeMu.Unlock()
+			if writeErr != nil {
 				break
 			}
 		}
@@ -415,7 +450,7 @@ func frameHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "image/jpeg")
-	w.Write(b)
+	_, _ = w.Write(b)
 }
 
 func statusHandler(w http.ResponseWriter, r *http.Request) {
@@ -424,7 +459,7 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 	statusMu.RUnlock()
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
-	json.NewEncoder(w).Encode(snap)
+	_ = json.NewEncoder(w).Encode(snap)
 }
 
 func fallHandler(w http.ResponseWriter, r *http.Request) {
@@ -436,7 +471,7 @@ func fallHandler(w http.ResponseWriter, r *http.Request) {
 		Lat *float64 `json:"lat"`
 		Lon *float64 `json:"lon"`
 	}
-	json.NewDecoder(r.Body).Decode(&body)
+	_ = json.NewDecoder(r.Body).Decode(&body)
 
 	loc := "unknown location"
 	if body.Lat != nil && body.Lon != nil {

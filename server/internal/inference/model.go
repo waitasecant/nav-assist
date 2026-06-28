@@ -52,7 +52,7 @@ func New(modelPath string) (*Model, error) {
 
 	outTensor, err := ort.NewEmptyTensor[float32](outShape)
 	if err != nil {
-		inTensor.Destroy()
+		_ = inTensor.Destroy()
 		return nil, fmt.Errorf("output tensor: %w", err)
 	}
 
@@ -64,8 +64,8 @@ func New(modelPath string) (*Model, error) {
 		nil,
 	)
 	if err != nil {
-		inTensor.Destroy()
-		outTensor.Destroy()
+		_ = inTensor.Destroy()
+		_ = outTensor.Destroy()
 		return nil, fmt.Errorf("create session: %w", err)
 	}
 
@@ -78,9 +78,9 @@ func New(modelPath string) (*Model, error) {
 
 // Close releases all ORT resources.
 func (m *Model) Close() {
-	m.session.Destroy()
-	m.inputTensor.Destroy()
-	m.outputTensor.Destroy()
+	_ = m.session.Destroy()
+	_ = m.inputTensor.Destroy()
+	_ = m.outputTensor.Destroy()
 }
 
 // Run decodes a JPEG frame and returns detections sorted by area ratio descending.
@@ -233,10 +233,6 @@ func AnnotateDepthWithThresholds(dets []Detection, closeness []float32, origW, o
 		dets[i].Tier  = classifyTierByDepthWith(dets[i].Depth, immClose, cautClose)
 	}
 	return dets
-}
-
-func classifyTierByDepth(closeness float32) string {
-	return classifyTierByDepthWith(closeness, 0.75, 0.45)
 }
 
 func classifyTierByDepthWith(closeness, immClose, cautClose float32) string {

@@ -45,7 +45,7 @@ func main() {
 		slog.Error("ort init failed", "err", err)
 		return
 	}
-	defer ort.DestroyEnvironment()
+	defer func() { _ = ort.DestroyEnvironment() }()
 
 	model, err := inference.New(*modelPath)
 	if err != nil {

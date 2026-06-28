@@ -32,6 +32,9 @@ export function useStreamer(
   const lastSentAtRef = useRef<number>(0);
   const frameCountRef = useRef(0);
   const streamingRef = useRef(false);
+  const inFlightRef = useRef(false);
+  const lastMsgAtRef = useRef(0);
+  const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
 
@@ -60,7 +63,8 @@ export function useStreamer(
             ),
           ]);
 
-          if (photo?.base64 && ws.readyState === WebSocket.OPEN) {
+          if (photo?.base64 && ws.readyState === WebSocket.OPEN && !inFlightRef.current) {
+            inFlightRef.current = true;
             lastSentAtRef.current = Date.now();
             ws.send(JSON.stringify({ ts: lastSentAtRef.current, frame: photo.base64 }));
             frameCountRef.current++;
@@ -87,6 +91,7 @@ export function useStreamer(
 
     ws.onopen = () => {
       retryDelayRef.current = 1000;
+      lastMsgAtRef.current = Date.now();
       setStats((s) => ({ ...s, status: "Connected ✓" }));
       ws.send(JSON.stringify({
         type: "config",
@@ -94,11 +99,21 @@ export function useStreamer(
         immClose: configRef.current.immClose,
         cautClose: configRef.current.cautClose,
       }));
+      watchdogRef.current = setInterval(() => {
+        if (Date.now() - lastMsgAtRef.current > 10_000) {
+          ws.close();
+        }
+      }, 3000);
       startCapture();
     };
 
-    ws.onclose = (event) => {
+    ws.onclose = (_event) => {
       streamingRef.current = false;
+      inFlightRef.current = false;
+      if (watchdogRef.current !== null) {
+        clearInterval(watchdogRef.current);
+        watchdogRef.current = null;
+      }
       const delay = retryDelayRef.current;
       retryDelayRef.current = Math.min(delay * 2, 30000);
       setStats((s) => ({ ...s, status: `Disconnected - retrying in ${delay / 1000}s` }));
@@ -106,10 +121,13 @@ export function useStreamer(
     };
 
     ws.onerror = () => {
+      inFlightRef.current = false;
       setStats((s) => ({ ...s, status: "Connection error" }));
     };
 
     ws.onmessage = (event) => {
+      inFlightRef.current = false;
+      lastMsgAtRef.current = Date.now();
       const rtt = Date.now() - lastSentAtRef.current;
       const msg = JSON.parse(event.data as string);
 
