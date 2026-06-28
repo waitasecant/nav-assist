@@ -1,6 +1,5 @@
 # NavAssist
-> Dev Names: Himanshu, Mohit Sinsniwal
-> 
+
 A software-only navigation assistant for visually impaired users. A smartphone worn on the chest streams camera frames over USB to a laptop in a backpack. The laptop runs real-time object detection with monocular depth estimation and sends haptic and spoken alerts back to the phone — no cloud, no Wi-Fi dependency, no specialised hardware.
 
 ## Motivation
