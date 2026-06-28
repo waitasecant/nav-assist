@@ -30,11 +30,11 @@ jobs:
       - name: Test
         run: go test -race ./...
 
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          working-directory: server
-          version: latest
+        run: golangci-lint run ./...
 
   client:
     name: TypeScript type-check
