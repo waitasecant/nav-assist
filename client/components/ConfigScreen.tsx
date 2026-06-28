@@ -1,14 +1,16 @@
 import React from "react";
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from "react-native";
 import { AppConfig } from "../hooks/useConfig";
+import { DiscoveredHost } from "../hooks/useDiscovery";
 
 interface Props {
   config: AppConfig;
   onChange: (patch: Partial<AppConfig>) => void;
   onClose: () => void;
+  discoveredHosts: DiscoveredHost[];
 }
 
-export function ConfigScreen({ config, onChange, onClose }: Props) {
+export function ConfigScreen({ config, onChange, onClose, discoveredHosts }: Props) {
   return (
     <View style={styles.overlay}>
       <ScrollView contentContainerStyle={styles.inner}>
@@ -57,6 +59,21 @@ export function ConfigScreen({ config, onChange, onClose }: Props) {
             keyboardType="numeric"
             autoCorrect={false}
           />
+          {discoveredHosts.length > 0 && (
+            <View style={styles.suggestions}>
+              <Text style={styles.suggestLabel}>Discovered:</Text>
+              {discoveredHosts.map((h) => (
+                <TouchableOpacity
+                  key={h.host}
+                  style={styles.chip}
+                  onPress={() => onChange({ serverIP: h.host })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.chipTxt}>{h.name}  {h.host}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
@@ -134,4 +151,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#444",
   },
+  suggestions: { gap: 8, marginTop: 4 },
+  suggestLabel: { color: "#888", fontSize: 13 },
+  chip: {
+    backgroundColor: "#1a3a5c",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#4af",
+  },
+  chipTxt: { color: "#4af", fontSize: 14 },
 });

@@ -6,6 +6,7 @@ import { useStreamer, WS_PORT, resolveHost } from "./hooks/useStreamer";
 import { useFallDetector } from "./hooks/useFallDetector";
 import { useSessionLog } from "./hooks/useSessionLog";
 import { useConfig } from "./hooks/useConfig";
+import { useDiscovery } from "./hooks/useDiscovery";
 import { StatsOverlay } from "./components/StatsOverlay";
 import { PermissionScreen } from "./components/PermissionScreen";
 import { FallAlert } from "./components/FallAlert";
@@ -16,6 +17,7 @@ export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const [showConfig, setShowConfig] = useState(false);
   const { config, setConfig } = useConfig();
+  const discoveredHosts = useDiscovery();
   const { logEvent } = useSessionLog();
   const { stats, connect, startFpsCounter, stop } = useStreamer(cameraRef, config, logEvent);
   const { fallDetected, dismiss, accelMag, fallState } = useFallDetector();
@@ -28,6 +30,13 @@ export default function App() {
       clearInterval(timer);
     };
   }, []);
+
+  // Auto-fill IP when exactly one server is discovered and no IP is configured.
+  useEffect(() => {
+    if (config.serverIP === "" && discoveredHosts.length === 1) {
+      setConfig({ serverIP: discoveredHosts[0].host });
+    }
+  }, [discoveredHosts]);
 
   const handleUnacknowledged = async () => {
     const host = resolveHost(config.serverIP);
@@ -58,7 +67,7 @@ export default function App() {
         <Text style={styles.gearTxt}>⚙</Text>
       </TouchableOpacity>
       {showConfig && (
-        <ConfigScreen config={config} onChange={setConfig} onClose={() => setShowConfig(false)} />
+        <ConfigScreen config={config} onChange={setConfig} onClose={() => setShowConfig(false)} discoveredHosts={discoveredHosts} />
       )}
       {fallDetected && <FallAlert onDismiss={dismiss} onUnacknowledged={handleUnacknowledged} />}
     </View>

@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "com.navassist.app",
+      "permissions": ["android.permission.CHANGE_WIFI_MULTICAST_STATE"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
