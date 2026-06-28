@@ -28,7 +28,12 @@ jobs:
         run: go build ./...
 
       - name: Test
-        run: go test ./...
+        run: go test -race ./...
+
+      - name: Lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: server
 
   client:
     name: TypeScript type-check
@@ -65,14 +70,23 @@ jobs:
         id: model-cache
         uses: actions/cache@v4
         with:
-          path: model/yolov8n.onnx
-          key: onnx-yolov8n-${{ hashFiles('tools/export.py') }}
+          path: |
+            model/yolov8n.onnx
+            model/midas_small.onnx
+          key: onnx-models-${{ hashFiles('tools/export.py') }}-v1
 
       - name: Export YOLO model (cache miss)
         if: steps.model-cache.outputs.cache-hit != 'true'
         run: |
           pip install --quiet ultralytics onnx onnxslim
           python tools/export.py
+
+      - name: Download MiDaS model (cache miss)
+        if: steps.model-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p model
+          curl -fsSL https://github.com/isl-org/MiDaS/releases/download/v2_1/model-small.onnx \
+            -o model/midas_small.onnx
 
       - name: Install smoke test dependencies
         run: pip install --quiet onnxruntime numpy

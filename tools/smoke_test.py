@@ -28,9 +28,7 @@ def test_yolo():
 
 def test_midas():
     path = MODEL_DIR / "midas_small.onnx"
-    if not path.exists():
-        print(f"[~] midas_small.onnx not found, skipping")
-        return
+    assert path.exists(), f"Model not found: {path}"
 
     session = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
     inp = session.get_inputs()[0]
