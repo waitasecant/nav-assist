@@ -36,7 +36,8 @@ export function FallAlert({ onDismiss, onUnacknowledged }: Props) {
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: "absolute",
+    top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: "rgba(160, 0, 0, 0.93)",
     alignItems: "center",
     justifyContent: "center",
