@@ -1,4 +1,10 @@
 # NavAssist
+[![GitHub Release](https://img.shields.io/github/v/release/waitasecant/nav-assist?label=Release&color=neongreen)](https://github.com/waitasecant/nav-assist/releases/latest)
+[![CI](https://img.shields.io/github/actions/workflow/status/waitasecant/nav-assist/ci.yml?logo=github&label=CI)](https://github.com/waitasecant/nav-assist/actions/workflows/ci.yml)
+[![Nightly](https://img.shields.io/github/actions/workflow/status/waitasecant/nav-assist/nightly.yml?logo=github&label=Nightly)](https://github.com/waitasecant/nav-assist/actions/workflows/nightly.yml)
+![Go](https://img.shields.io/github/go-mod/go-version/waitasecant/nav-assist/main?filename=server%2Fgo.mod&logo=go&logoColor=white&label=Go)
+![Platform](https://img.shields.io/badge/platform-Android-neongreen?logo=android&logoColor=white)
+[![License: MIT](https://img.shields.io/badge/License-MIT-neon.svg)](LICENSE)
 
 A software-only navigation assistant for visually impaired users. A smartphone worn on the chest streams camera frames wirelessly to a laptop in a backpack. The laptop runs real-time object detection with monocular depth estimation and sends haptic and spoken alerts back to the phone — no cloud, no specialised hardware.
 
@@ -161,14 +167,14 @@ Requires Android 11+ and ADB installed on the laptop.
 3. Tap **Pair device with pairing code** — note the IP, pairing port, and 6-digit code shown on screen.
 4. On the laptop, pair once:
    ```powershell
-   adb pair 192.168.1.5:37891   # use your phone's IP and pairing port
+   adb pair 192.168.x.x:37891   # use your phone's IP and pairing port
    # Enter the 6-digit pairing code when prompted
    ```
 5. Back on the phone, note the connection port shown on the main *Wireless debugging* screen (different from the pairing port).
 6. Connect:
    ```powershell
-   adb connect 192.168.1.5:43335   # use your phone's IP and connection port
-   adb devices                      # should show: 192.168.1.5:43335  device
+   adb connect 192.168.x.x:43335   # use your phone's IP and connection port
+   adb devices                      # should show: 192.168.x.x:43335  device
    ```
 7. Open the app — the server sets up `adb reverse` automatically. Leave *Server IP* blank.
 
@@ -216,8 +222,8 @@ Creates a Python venv, installs `ultralytics`, exports `yolov8n.onnx` into `mode
 
 **ADB Wi-Fi (recommended):** pair once, then connect:
 ```powershell
-adb pair 192.168.1.5:37891    # IP and pairing port from phone's "Pair using pairing code" screen
-adb connect 192.168.1.5:43335 # IP and connection port from main Wireless debugging screen
+adb pair 192.168.x.x:37891    # IP and pairing port from phone's "Pair using pairing code" screen
+adb connect 192.168.x.x:43335 # IP and connection port from main Wireless debugging screen
 adb reverse tcp:8081 tcp:8081 # Expo bundler tunnel (dev only)
 ```
 
