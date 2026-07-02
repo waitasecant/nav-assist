@@ -41,9 +41,9 @@ jobs:
             ext: ".exe"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: server/go.mod
           cache-dependency-path: server/go.sum
@@ -116,7 +116,7 @@ jobs:
           fi
 
       - name: Upload bundle artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: navassist-server-${{ matrix.goos }}-${{ matrix.goarch }}
           path: navassist-server-${{ matrix.goos }}-${{ matrix.goarch }}.zip
@@ -125,9 +125,9 @@ jobs:
     name: Build Android APK
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
@@ -162,7 +162,7 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
 
       - name: Upload APK artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: navassist-apk
           path: dist/navassist.apk
@@ -174,10 +174,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download all server bundles
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: artifacts/
 
@@ -197,7 +197,7 @@ jobs:
           echo "tag=${PREV}" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: "NavAssist ${{ github.ref_name }}"
           body: |
