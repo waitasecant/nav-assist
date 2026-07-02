@@ -1,0 +1,72 @@
+name: Bug Report
+description: Something is not working as expected
+labels: [bug]
+body:
+  - type: dropdown
+    id: connection
+    attributes:
+      label: Connection mode
+      options:
+        - Wi-Fi / mDNS (no ADB)
+        - ADB Wi-Fi (wireless debugging)
+        - USB cable
+    validations:
+      required: true
+
+  - type: input
+    id: phone
+    attributes:
+      label: Phone model & Android version
+      placeholder: e.g. Pixel 7a, Android 16
+    validations:
+      required: true
+
+  - type: dropdown
+    id: server_os
+    attributes:
+      label: Server OS
+      options:
+        - Windows
+        - Linux (x64)
+        - Linux (arm64 / Raspberry Pi)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: NavAssist version
+      placeholder: e.g. v0.3.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the server
+        2. Open the app
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server logs (if relevant)
+      render: text

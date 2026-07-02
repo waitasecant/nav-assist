@@ -3,7 +3,7 @@
 [![CI](https://img.shields.io/github/actions/workflow/status/waitasecant/nav-assist/ci.yml?logo=github&label=CI)](https://github.com/waitasecant/nav-assist/actions/workflows/ci.yml)
 [![Nightly](https://img.shields.io/github/actions/workflow/status/waitasecant/nav-assist/nightly.yml?logo=github&label=Nightly)](https://github.com/waitasecant/nav-assist/actions/workflows/nightly.yml)
 ![Go](https://img.shields.io/github/go-mod/go-version/waitasecant/nav-assist/main?filename=server%2Fgo.mod&logo=go&logoColor=white&label=Go)
-![Platform](https://img.shields.io/badge/platform-Android-neongreen?logo=android&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Android-neongreen?logo=android&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/License-MIT-neon.svg)](LICENSE)
 
 A software-only navigation assistant for visually impaired users. A smartphone worn on the chest streams camera frames wirelessly to a laptop in a backpack. The laptop runs real-time object detection with monocular depth estimation and sends haptic and spoken alerts back to the phone — no cloud, no specialised hardware.

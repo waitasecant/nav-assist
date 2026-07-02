@@ -1,0 +1,19 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /server
+    schedule:
+      interval: weekly
+    labels: [dependencies, go]
+
+  - package-ecosystem: npm
+    directory: /client
+    schedule:
+      interval: weekly
+    labels: [dependencies, javascript]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies, ci]
