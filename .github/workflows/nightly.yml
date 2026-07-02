@@ -34,7 +34,7 @@ jobs:
           python tools/smoke_test.py
 
       - name: Upload ONNX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: onnx-models-${{ github.run_id }}
           path: |
