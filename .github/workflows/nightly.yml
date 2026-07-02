@@ -31,5 +31,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: onnx-models-${{ github.run_id }}
-          path: model/yolov8n.onnx
+          path: |
+            model/yolov8n.onnx
+            model/midas_small.onnx
           retention-days: 30
