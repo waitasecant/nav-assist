@@ -1,10 +1,10 @@
 # NavAssist
 
-A software-only navigation assistant for visually impaired users. A smartphone worn on the chest streams camera frames over USB to a laptop in a backpack. The laptop runs real-time object detection with monocular depth estimation and sends haptic and spoken alerts back to the phone — no cloud, no Wi-Fi dependency, no specialised hardware.
+A software-only navigation assistant for visually impaired users. A smartphone worn on the chest streams camera frames wirelessly to a laptop in a backpack. The laptop runs real-time object detection with monocular depth estimation and sends haptic and spoken alerts back to the phone — no cloud, no specialised hardware.
 
 ## Motivation
 
-Existing blind navigation aids either cost thousands of dollars (ultrasonic canes, smart glasses) or rely on cloud APIs that introduce latency and privacy concerns. NavAssist is built entirely from off-the-shelf consumer hardware — a phone and a laptop — connected by a USB cable.
+Existing blind navigation aids either cost thousands of dollars (ultrasonic canes, smart glasses) or rely on cloud APIs that introduce latency and privacy concerns. NavAssist is built entirely from off-the-shelf consumer hardware — a phone and a laptop — connected via ADB Wi-Fi or a USB cable.
 
 ---
 
@@ -31,7 +31,7 @@ graph LR
         ANA[analysis.py Report]
     end
 
-    CAM -->|JPEG frames @ 10 FPS\nWebSocket over USB adb reverse| YOLO
+    CAM -->|JPEG frames @ 10 FPS\nWebSocket over adb reverse| YOLO
     YOLO -->|bounding boxes| MIDAS
     MIDAS -->|per-object depth| CMD
     CMD -->|vibrate / speak payload| FB
@@ -42,7 +42,7 @@ graph LR
     LOG -->|session.db| ANA
 ```
 
-- The phone captures JPEG frames at ~10 FPS and sends them over a WebSocket tunnelled through `adb reverse` (USB).
+- The phone captures JPEG frames at ~10 FPS and sends them over a WebSocket tunnelled through `adb reverse` (Wi-Fi or USB).
 - The laptop runs YOLOv8-nano (ONNX) for detection and MiDaS v2.1 (ONNX) for per-pixel depth. The median closeness value per bounding box determines the hazard tier.
 - The laptop sends a `commands` payload back — `vibrate` and/or `speak` — executed by the phone via `expo-haptics` and `expo-speech`.
 - The phone independently detects falls from IMU data and POSTs to `/fall`; the server can trigger an emergency SMS via Twilio.
@@ -80,6 +80,7 @@ When MiDaS is unavailable the system falls back to bounding-box area ratio.
 │   │   ├── server/main.go          # WebSocket server entry point
 │   │   └── replay/main.go          # Offline replay of recorded sessions
 │   ├── internal/
+│   │   ├── adb/adb.go              # Auto adb reverse tunnel (Wi-Fi or USB)
 │   │   ├── inference/
 │   │   │   ├── model.go            # YOLOv8 ORT session + AnnotateDepth
 │   │   │   ├── depth.go            # MiDaS ORT session, closeness map
@@ -139,22 +140,50 @@ Each `v*` tag triggers a GitHub Actions release that publishes pre-built artifac
 
 ### Quick start (no source required)
 
-Go to the [latest release](https://github.com/waitasecant/nav-assist/releases/latest) and download:
-- The server bundle for your platform (e.g. `navassist-server-windows-amd64.zip`)
-- `navassist.apk`
+Go to the [latest release](https://github.com/waitasecant/nav-assist/releases/latest) and download the server bundle for your platform and `navassist.apk`.
 
-```powershell
-# 1. Unzip server bundle and run — models download automatically (~35 MB)
-.\navassist-server.exe
+**Option A — Wi-Fi / mDNS (easiest, no ADB)**
 
-# 2. Install APK onto phone
-adb install navassist.apk
+1. Unzip the server bundle and run it — models download automatically (~35 MB):
+   ```powershell
+   .\navassist-server.exe
+   ```
+2. On your phone, open the release page in a browser, download `navassist.apk`, and install it (enable *Install from unknown sources* when prompted).
+3. Connect phone and laptop to the **same Wi-Fi network**.
+4. Open the app — it discovers the server automatically via mDNS. Grant camera permission and start streaming.
 
-# 3. Tunnel USB port (re-run after every USB reconnect)
-adb reverse tcp:8000 tcp:8000
+**Option B — ADB Wi-Fi (no cable, lower latency than mDNS)**
 
-# 4. Open the app — grant camera permission when prompted, leave "Server IP" blank
-```
+Requires Android 11+ and ADB installed on the laptop.
+
+1. Run the server as in Option A.
+2. On the phone: *Settings → Developer Options → Wireless debugging → enable*.
+3. Tap **Pair device with pairing code** — note the IP, pairing port, and 6-digit code shown on screen.
+4. On the laptop, pair once:
+   ```powershell
+   adb pair 192.168.1.5:37891   # use your phone's IP and pairing port
+   # Enter the 6-digit pairing code when prompted
+   ```
+5. Back on the phone, note the connection port shown on the main *Wireless debugging* screen (different from the pairing port).
+6. Connect:
+   ```powershell
+   adb connect 192.168.1.5:43335   # use your phone's IP and connection port
+   adb devices                      # should show: 192.168.1.5:43335  device
+   ```
+7. Open the app — the server sets up `adb reverse` automatically. Leave *Server IP* blank.
+
+The device stays paired; you only need to repeat `adb connect` after rebooting the phone.
+
+**Option C — USB cable (lowest latency)**
+
+1. Run the server as in Option A.
+2. Enable *USB Debugging* on the phone (*Developer Options → USB Debugging*), connect the cable, and accept the trust prompt.
+3. Install the APK:
+   ```powershell
+   adb install navassist.apk
+   adb devices   # should show your device
+   ```
+4. Open the app — the server sets up `adb reverse` automatically. Leave *Server IP* blank.
 
 ---
 
@@ -168,7 +197,7 @@ adb reverse tcp:8000 tcp:8000
 | [ADB](https://developer.android.com/tools/releases/platform-tools) | Must be on `PATH` |
 | [Python 3.10+](https://python.org/downloads/) | For tools (model export, analysis) |
 | [Expo Go](https://expo.dev/go) | Installed on phone |
-| USB Debugging | Settings -> Developer Options -> USB Debugging |
+| Wireless debugging | *Settings → Developer Options → Wireless debugging* (Android 11+) |
 
 ---
 
@@ -183,14 +212,21 @@ cd tools
 
 Creates a Python venv, installs `ultralytics`, exports `yolov8n.onnx` into `model/`.
 
-### Step 2 — Connect phone via USB
+### Step 2 — Connect phone via ADB
 
+**ADB Wi-Fi (recommended):** pair once, then connect:
 ```powershell
-adb reverse tcp:8000 tcp:8000
-adb reverse tcp:8081 tcp:8081
+adb pair 192.168.1.5:37891    # IP and pairing port from phone's "Pair using pairing code" screen
+adb connect 192.168.1.5:43335 # IP and connection port from main Wireless debugging screen
+adb reverse tcp:8081 tcp:8081 # Expo bundler tunnel (dev only)
 ```
 
-Re-run these every time you reconnect the USB cable.
+**USB fallback:** connect the cable and accept the trust prompt, then:
+```powershell
+adb reverse tcp:8081 tcp:8081 # Expo bundler tunnel (dev only)
+```
+
+Port 8000 (`/ws`) is tunnelled automatically by the server on startup and reconnect.
 
 ### Step 3 — Start the Go server
 
@@ -290,7 +326,7 @@ go run .\cmd\replay\ -dir ..\recordings\session1
 | Depth estimation | MiDaS v2.1 small (ONNX), same ORT runtime |
 | Observability | Prometheus (`/metrics`), SQLite session log |
 | Dashboard | Embedded HTML served at `/dashboard` |
-| Transport | WebSocket over `adb reverse` (USB) |
+| Transport | WebSocket over `adb reverse` (Wi-Fi or USB) |
 | Phone app | React Native (Expo), TypeScript |
 | Haptics | `expo-haptics` |
 | TTS | `expo-speech` |

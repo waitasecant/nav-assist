@@ -25,6 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	ort "github.com/yalue/onnxruntime_go"
 
+	"navassist/internal/adb"
 	"navassist/internal/commands"
 	"navassist/internal/dashboard"
 	"navassist/internal/inference"
@@ -269,7 +270,7 @@ func main() {
 	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_ = ctx
+	adb.WatchAndReverse(ctx, cfg.port)
 	if err := http.ListenAndServe(":"+cfg.port, nil); err != nil {
 		slog.Error("server failed", "err", err)
 	}
