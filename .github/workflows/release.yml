@@ -185,6 +185,9 @@ jobs:
         run: |
           pip install --quiet ultralytics onnx onnxslim onnxruntime numpy
           python tools/export.py
+          mkdir -p model
+          curl -fsSL https://github.com/isl-org/MiDaS/releases/download/v2_1/model-small.onnx \
+            -o model/midas_small.onnx
           python tools/smoke_test.py
 
       - name: Create GitHub Release
