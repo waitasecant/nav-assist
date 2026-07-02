@@ -22,6 +22,12 @@ jobs:
       - name: Export YOLO model
         run: python tools/export.py
 
+      - name: Download MiDaS model
+        run: |
+          mkdir -p model
+          curl -fsSL https://github.com/isl-org/MiDaS/releases/download/v2_1/model-small.onnx \
+            -o model/midas_small.onnx
+
       - name: Run smoke test
         run: |
           pip install --quiet onnxruntime numpy
