@@ -25,7 +25,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	ort "github.com/yalue/onnxruntime_go"
 
-	"navassist/internal/adb"
+	// "navassist/internal/adb"
 	"navassist/internal/commands"
 	"navassist/internal/dashboard"
 	"navassist/internal/inference"
@@ -90,18 +90,56 @@ func ensureModel(dst, downloadURL string) error {
 	return err
 }
 
-// localIP returns the first non-loopback IPv4 address, or "localhost".
+// localIP returns the most likely LAN IPv4 address by preferring addresses
+// that are reachable via an interface with a default gateway (i.e. not
+// link-local/APIPA 169.254.x.x and not virtual adapter ranges).
 func localIP() string {
-	addrs, err := net.InterfaceAddrs()
+	ifaces, err := net.Interfaces()
 	if err != nil {
 		return "localhost"
 	}
-	for _, a := range addrs {
-		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if v4 := ipnet.IP.To4(); v4 != nil {
+	var fallback string
+	for _, iface := range ifaces {
+		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
+			continue
+		}
+		addrs, err := iface.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			ipnet, ok := a.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			v4 := ipnet.IP.To4()
+			if v4 == nil {
+				continue
+			}
+			// Skip link-local (APIPA) — these come from virtual/unconnected adapters.
+			if v4[0] == 169 && v4[1] == 254 {
+				continue
+			}
+			// Prefer private LAN ranges (10.x, 172.16-31.x, 192.168.x).
+			if v4[0] == 192 && v4[1] == 168 {
 				return v4.String()
 			}
+			if v4[0] == 10 {
+				return v4.String()
+			}
+			if v4[0] == 172 && v4[1] >= 16 && v4[1] <= 31 {
+				if fallback == "" {
+					fallback = v4.String()
+				}
+				continue
+			}
+			if fallback == "" {
+				fallback = v4.String()
+			}
 		}
+	}
+	if fallback != "" {
+		return fallback
 	}
 	return "localhost"
 }
@@ -270,7 +308,9 @@ func main() {
 	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	adb.WatchAndReverse(ctx, cfg.port)
+	// DEBUG: adb tunnel disabled to isolate mDNS discovery issue.
+	// adb.WatchAndReverse(ctx, cfg.port)
+	_ = ctx
 	if err := http.ListenAndServe(":"+cfg.port, nil); err != nil {
 		slog.Error("server failed", "err", err)
 	}

@@ -38,6 +38,18 @@ export default function App() {
     }
   }, [discoveredHosts]);
 
+  // Reconnect when serverIP is set for the first time (e.g. mDNS auto-fill).
+  // The initial connect() used 127.0.0.1; now we have a real host.
+  const prevServerIP = useRef(config.serverIP);
+  useEffect(() => {
+    const prev = prevServerIP.current;
+    prevServerIP.current = config.serverIP;
+    if (prev === "" && config.serverIP !== "") {
+      stop();
+      connect();
+    }
+  }, [config.serverIP]);
+
   const handleUnacknowledged = async () => {
     const host = resolveHost(config.serverIP);
     try {
