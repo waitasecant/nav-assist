@@ -2,7 +2,7 @@
   "expo": {
     "name": "NavAssist",
     "slug": "navassist",
-    "version": "0.4.1",
+    "version": "0.4.2",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -27,7 +27,7 @@
       "./plugins/withNetworkSecurityConfig",
       ["expo-splash-screen", {
         "image": "./assets/splash-icon.png",
-        "resizeMode": "contain",
+        "imageWidth": 320,
         "backgroundColor": "#000000"
       }]
     ],
