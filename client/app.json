@@ -15,12 +15,12 @@
       "permissions": ["android.permission.CHANGE_WIFI_MULTICAST_STATE"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#000000"
+        "backgroundColor": "#ffffff"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.ico"
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
       "expo-sqlite",
