@@ -175,6 +175,8 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Download all server bundles
         uses: actions/download-artifact@v8
@@ -196,22 +198,16 @@ jobs:
           PREV=$(git tag --sort=-version:refname | grep -v "^${{ github.ref_name }}$" | head -1)
           echo "tag=${PREV}" >> "$GITHUB_OUTPUT"
 
+      - name: Generate release body
+        run: |
+          COMPARE_URL="https://github.com/${{ github.repository }}/compare/${{ steps.prev_tag.outputs.tag }}...${{ github.ref_name }}"
+          sed "s|{{COMPARE_URL}}|${COMPARE_URL}|g" .github/release-template.md > release-body.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
           name: "NavAssist ${{ github.ref_name }}"
-          body: |
-            **Full changelog:** https://github.com/${{ github.repository }}/compare/${{ steps.prev_tag.outputs.tag }}...${{ github.ref_name }}
-
-            **Server** — download the bundle for your OS, unzip, run `navassist-server`.
-            Models are downloaded automatically on first launch (~35 MB).
-
-            **Phone** — sideload `navassist.apk` (enable *Install from unknown sources*).
-
-            Both must be on the same Wi-Fi network. The app discovers the server via mDNS
-            or you can scan the QR code printed in the server terminal.
-
-            For USB/developer mode: leave *Server IP* blank in the app settings.
+          body_path: release-body.md
           files: |
             artifacts/**/*.zip
             artifacts/navassist-apk/navassist.apk

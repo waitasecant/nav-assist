@@ -51,10 +51,10 @@ venv/
 .claude/
 AGENTS.md
 CLAUDE.md
+copilot-instructions.md
 
 # folders
 docs/
-*.md
 .vscode/
 
 # downloads
