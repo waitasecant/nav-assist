@@ -1,4 +1,4 @@
-# NavAssist
+# NavAssist <img src="icon.png" alt="NavAssist" width="70" align="center">
 [![GitHub Release](https://img.shields.io/github/v/release/waitasecant/nav-assist?label=Release&color=neongreen)](https://github.com/waitasecant/nav-assist/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/waitasecant/nav-assist/ci.yml?logo=github&label=CI)](https://github.com/waitasecant/nav-assist/actions/workflows/ci.yml)
 [![Nightly](https://img.shields.io/github/actions/workflow/status/waitasecant/nav-assist/nightly.yml?logo=github&label=Nightly)](https://github.com/waitasecant/nav-assist/actions/workflows/nightly.yml)
