@@ -2,7 +2,7 @@
   "expo": {
     "name": "NavAssist",
     "slug": "navassist",
-    "version": "0.4.0",
+    "version": "0.4.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,7 +14,7 @@
       "versionCode": 1,
       "permissions": ["android.permission.CHANGE_WIFI_MULTICAST_STATE"],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#000000"
       },
       "predictiveBackGestureEnabled": false
