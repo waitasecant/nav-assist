@@ -1,7 +1,7 @@
 # NavAssist Go server startup script
 # Run from the server/ directory: .\start.ps1
 
-$ORT_VERSION = "1.20.1"
+$ORT_VERSION = "1.26.0"
 $ORT_URL     = "https://github.com/microsoft/onnxruntime/releases/download/v$ORT_VERSION/onnxruntime-win-x64-$ORT_VERSION.zip"
 $ORT_DLL     = "lib\onnxruntime.dll"
 $BINARY      = "navassist.exe"

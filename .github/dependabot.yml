@@ -8,6 +8,8 @@ updates:
     groups:
       go-deps:
         patterns: ["*"]
+    ignore:
+      - dependency-name: github.com/yalue/onnxruntime_go
 
   - package-ecosystem: npm
     directory: /client
@@ -20,6 +22,10 @@ updates:
     ignore:
       - dependency-name: typescript
         update-types: [version-update:semver-major]
+      - dependency-name: "@react-native-async-storage/async-storage"
+        update-types: [version-update:semver-major]
+      - dependency-name: react
+        update-types: [version-update:semver-patch]
 
   - package-ecosystem: github-actions
     directory: /
