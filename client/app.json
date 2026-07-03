@@ -27,8 +27,8 @@
       "./plugins/withNetworkSecurityConfig",
       ["expo-splash-screen", {
         "image": "./assets/splash-icon.png",
-        "imageWidth": 320,
-        "backgroundColor": "#000000"
+        "imageWidth": 240,
+        "backgroundColor": "#ffffff"
       }]
     ],
     "extra": {
