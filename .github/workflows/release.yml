@@ -6,7 +6,7 @@ on:
 
 # ORT version must match what yalue/onnxruntime_go expects.
 env:
-  ORT_VERSION: "1.20.1"
+  ORT_VERSION: "1.26.0"
 
 jobs:
   server:

@@ -1,4 +1,4 @@
-# NavAssist <img src="icon.png" alt="NavAssist" width="70" align="center">
+# <img src="icon.png" alt="NavAssist" width="70" align="center"> NavAssist
 [![GitHub Release](https://img.shields.io/github/v/release/waitasecant/nav-assist?label=Release&color=neongreen)](https://github.com/waitasecant/nav-assist/releases/latest)
 [![CI](https://img.shields.io/github/actions/workflow/status/waitasecant/nav-assist/ci.yml?logo=github&label=CI)](https://github.com/waitasecant/nav-assist/actions/workflows/ci.yml)
 [![Nightly](https://img.shields.io/github/actions/workflow/status/waitasecant/nav-assist/nightly.yml?logo=github&label=Nightly)](https://github.com/waitasecant/nav-assist/actions/workflows/nightly.yml)
@@ -243,7 +243,7 @@ cd server
 
 `start.ps1` automatically:
 - Adds MinGW gcc to `PATH` if found at common MSYS2 paths
-- Downloads `onnxruntime.dll` v1.20.1 on first run (~8 MB)
+- Downloads `onnxruntime.dll` v1.26.0 on first run (~8 MB)
 - Downloads `midas_small.onnx` on first run (~80 MB)
 - Builds and starts `navassist.exe` on `0.0.0.0:8000`
 
