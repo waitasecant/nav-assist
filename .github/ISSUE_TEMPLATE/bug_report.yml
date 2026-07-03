@@ -36,7 +36,7 @@ body:
     id: version
     attributes:
       label: NavAssist version
-      placeholder: e.g. v0.3.0
+      placeholder: e.g. v0.1.0
     validations:
       required: true
 

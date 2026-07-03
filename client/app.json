@@ -2,7 +2,7 @@
   "expo": {
     "name": "NavAssist",
     "slug": "navassist",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -11,16 +11,16 @@
     },
     "android": {
       "package": "com.navassist.app",
-      "versionCode": 3,
+      "versionCode": 1,
       "permissions": ["android.permission.CHANGE_WIFI_MULTICAST_STATE"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#000000"
       },
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.ico"
     },
     "plugins": [
       "expo-sqlite",
@@ -28,7 +28,7 @@
       ["expo-splash-screen", {
         "image": "./assets/splash-icon.png",
         "resizeMode": "contain",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#000000"
       }]
     ],
     "extra": {
