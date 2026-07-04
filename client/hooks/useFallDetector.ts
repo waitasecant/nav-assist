@@ -12,7 +12,7 @@ const IMPACT_WINDOW  = 3000;  // max ms to wait for still phase after spike
 
 type State = "idle" | "impact";
 
-export function useFallDetector() {
+export function useFallDetector(enabled: boolean) {
   const [fallDetected, setFallDetected] = useState(false);
   const [accelMag, setAccelMag] = useState(0);
   const [fallState, setFallState] = useState<State>("idle");
@@ -23,6 +23,10 @@ export function useFallDetector() {
   const stillStart  = useRef<number | null>(null);
 
   useEffect(() => {
+    if (!enabled) {
+      setFallDetected(false);
+      return;
+    }
     Accelerometer.setUpdateInterval(10); // 100 Hz
 
     const sub = Accelerometer.addListener(({ x, y, z }) => {

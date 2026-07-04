@@ -15,7 +15,7 @@ export function resolveHost(serverIP: string): string {
   return serverIP.trim() || "127.0.0.1";
 }
 
-interface Stats {
+export interface Stats {
   status: string;
   latency: number | null;
   fps: number;
@@ -163,15 +163,22 @@ export function useStreamer(
         onHazard(top.tier, top.label, top.depth);
       }
 
+      const tier = top?.tier ?? "AWARE";
+      const cfg = configRef.current;
+      const alertable = cfg.minAlertTier === "IMMEDIATE"
+        ? tier === "IMMEDIATE"
+        : tier !== "AWARE";
+
       for (const cmd of msg.commands ?? []) {
-        if (cmd.action === "vibrate") {
+        if (!alertable) break;
+        if (cmd.action === "vibrate" && cfg.hapticAlerts) {
           const style =
             cmd.intensity === "high"   ? Haptics.ImpactFeedbackStyle.Heavy :
             cmd.intensity === "medium" ? Haptics.ImpactFeedbackStyle.Medium :
                                          Haptics.ImpactFeedbackStyle.Light;
           Haptics.impactAsync(style);
-        } else if (cmd.action === "speak") {
-          Speech.speak(cmd.text, { rate: configRef.current.ttsRate, language: "en" });
+        } else if (cmd.action === "speak" && cfg.voiceAlerts) {
+          Speech.speak(cmd.text, { rate: 1.1, language: "en" });
         }
       }
     };

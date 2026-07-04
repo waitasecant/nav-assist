@@ -1,7 +1,8 @@
 import React, { useRef, useEffect, useState } from "react";
-import { View, TouchableOpacity, Text, StyleSheet } from "react-native";
+import { View, TouchableOpacity, StyleSheet } from "react-native";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as Location from "expo-location";
+import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStreamer, WS_PORT, resolveHost } from "./hooks/useStreamer";
 import { useFallDetector } from "./hooks/useFallDetector";
 import { useSessionLog } from "./hooks/useSessionLog";
@@ -10,17 +11,21 @@ import { useDiscovery } from "./hooks/useDiscovery";
 import { StatsOverlay } from "./components/StatsOverlay";
 import { PermissionScreen } from "./components/PermissionScreen";
 import { FallAlert } from "./components/FallAlert";
+import { Ionicons } from "@expo/vector-icons";
 import { ConfigScreen } from "./components/ConfigScreen";
+import { DashboardScreen } from "./components/DashboardScreen";
 
-export default function App() {
+function AppContent() {
+  const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [showConfig, setShowConfig] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
   const { config, setConfig } = useConfig();
   const discoveredHosts = useDiscovery();
-  const { logEvent } = useSessionLog();
+  const { logEvent, getTierDistribution, getTopHazards, getTimeline, getRecentEvents, clearHistory } = useSessionLog();
   const { stats, connect, startFpsCounter, stop } = useStreamer(cameraRef, config, logEvent);
-  const { fallDetected, dismiss, accelMag, fallState } = useFallDetector();
+  const { fallDetected, dismiss, accelMag, fallState } = useFallDetector(config.fallDetection);
 
   useEffect(() => {
     const timer = startFpsCounter();
@@ -71,28 +76,51 @@ export default function App() {
     return <PermissionScreen onRequest={requestPermission} />;
   }
 
+  const btnTop = insets.top + 8;
+
   return (
     <View style={styles.container}>
-      <CameraView ref={cameraRef} style={styles.camera} facing="back" mute />
-      <StatsOverlay {...stats} accelMag={accelMag} fallState={fallState} />
-      <TouchableOpacity style={styles.gear} onPress={() => setShowConfig(true)} activeOpacity={0.7}>
-        <Text style={styles.gearTxt}>⚙</Text>
+      <CameraView
+        ref={cameraRef}
+        style={[styles.camera, { marginTop: insets.top, marginBottom: insets.bottom }]}
+        facing="back"
+        mute
+      />
+      <StatsOverlay {...stats} accelMag={accelMag} fallState={fallState} topInset={insets.top} />
+      <TouchableOpacity style={[styles.iconBtn, { top: btnTop, right: 16 }]} onPress={() => setShowConfig(true)} activeOpacity={0.7}>
+        <Ionicons name="settings-outline" size={22} color="#fff" />
+      </TouchableOpacity>
+      <TouchableOpacity style={[styles.iconBtn, { top: btnTop, right: 68 }]} onPress={() => setShowDashboard(true)} activeOpacity={0.7}>
+        <Ionicons name="analytics-outline" size={22} color="#fff" />
       </TouchableOpacity>
       {showConfig && (
-        <ConfigScreen config={config} onChange={setConfig} onClose={() => setShowConfig(false)} discoveredHosts={discoveredHosts} />
+        <ConfigScreen config={config} onChange={setConfig} onClose={() => setShowConfig(false)} />
+      )}
+      {showDashboard && (
+        <DashboardScreen
+          stats={stats}
+          sessionLog={{ getTierDistribution, getTopHazards, getRecentEvents, clearHistory }}
+          onClose={() => setShowDashboard(false)}
+        />
       )}
       {fallDetected && <FallAlert onDismiss={dismiss} onUnacknowledged={handleUnacknowledged} />}
     </View>
   );
 }
 
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   camera: { flex: 1 },
-  gear: {
+  iconBtn: {
     position: "absolute",
-    top: 52,
-    right: 16,
     backgroundColor: "rgba(0,0,0,0.5)",
     width: 44,
     height: 44,
@@ -100,5 +128,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  gearTxt: { color: "#fff", fontSize: 22 },
 });

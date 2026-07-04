@@ -2,18 +2,24 @@ import { useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export interface AppConfig {
-  confidence: number; // YOLO confidence filter 0.2–0.8
-  immClose: number;   // depth closeness for IMMEDIATE 0.5–0.95
-  cautClose: number;  // depth closeness for CAUTION 0.2–0.7
-  ttsRate: number;    // TTS speech rate 0.5–2.0
-  serverIP: string;   // empty = localhost (USB); set to Wi-Fi IP for wireless
+  confidence: number;                    // YOLO confidence filter 0.2–0.8
+  immClose: number;                      // depth closeness for IMMEDIATE 0.5–0.95
+  cautClose: number;                     // depth closeness for CAUTION 0.2–0.7
+  voiceAlerts: boolean;                  // enable TTS announcements
+  hapticAlerts: boolean;                 // enable vibration feedback
+  minAlertTier: "CAUTION" | "IMMEDIATE"; // lowest tier that triggers alerts
+  fallDetection: boolean;                // enable accelerometer fall detection
+  serverIP: string;                      // empty = localhost (USB)
 }
 
-const DEFAULTS: AppConfig = {
+export const DEFAULTS: AppConfig = {
   confidence: 0.40,
   immClose: 0.75,
   cautClose: 0.45,
-  ttsRate: 1.1,
+  voiceAlerts: true,
+  hapticAlerts: true,
+  minAlertTier: "CAUTION",
+  fallDetection: true,
   serverIP: "",
 };
 
@@ -36,5 +42,10 @@ export function useConfig() {
     });
   };
 
-  return { config, setConfig };
+  const resetConfig = () => {
+    setConfigState(DEFAULTS);
+    AsyncStorage.setItem(KEY, JSON.stringify(DEFAULTS));
+  };
+
+  return { config, setConfig, resetConfig };
 }

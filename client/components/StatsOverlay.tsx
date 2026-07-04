@@ -1,6 +1,5 @@
-import React from "react";
-import { View, Text, StyleSheet } from "react-native";
-import { WS_PORT } from "../hooks/useStreamer";
+import React, { useState } from "react";
+import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 
 interface Props {
   status: string;
@@ -11,45 +10,56 @@ interface Props {
   dropped: number;
   accelMag: number;
   fallState: string;
+  topInset: number;
 }
 
-export function StatsOverlay({ status, latency, fps, frameCount, hazard, dropped, accelMag, fallState }: Props) {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>NavAssist</Text>
-      <StatRow label="Port" value={`${WS_PORT}`} />
-      <StatRow label="Status" value={status} />
-      <StatRow label="RTT Latency" value={latency != null ? `${latency} ms` : "-"} />
-      <StatRow label="FPS" value={String(fps)} />
-      <StatRow label="Dropped/s" value={String(dropped)} />
-      <StatRow label="Total Frames" value={String(frameCount)} />
-      <StatRow label="Hazard" value={hazard ?? "Clear"} />
-      <StatRow label="Accel |a|" value={`${accelMag} g`} />
-      <StatRow label="Fall State" value={fallState} />
-    </View>
-  );
-}
+export function StatsOverlay({ status, hazard, topInset }: Props) {
+  const [expanded, setExpanded] = useState(false);
+  const connected = status.startsWith("Connected");
 
-function StatRow({ label, value }: { label: string; value: string }) {
   return (
-    <Text style={styles.row}>
-      {label}: <Text style={styles.value}>{value}</Text>
-    </Text>
+    <>
+      <TouchableOpacity
+        style={[styles.statusBtn, { top: topInset + 8 }]}
+        onPress={() => setExpanded((e) => !e)}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.dot, { backgroundColor: connected ? "#34c759" : "#ff3b30" }]} />
+        {expanded && <Text style={styles.statusTxt}>{status}</Text>}
+      </TouchableOpacity>
+
+      {hazard && (
+        <View style={styles.hazardBar}>
+          <Text style={styles.hazardTxt}>{hazard}</Text>
+        </View>
+      )}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  statusBtn: {
+    position: "absolute",
+    left: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: 22,
+    paddingHorizontal: 12,
+    height: 44,
+    gap: 8,
+  },
+  dot: { width: 10, height: 10, borderRadius: 5 },
+  statusTxt: { color: "#fff", fontSize: 13, maxWidth: 220 },
+  hazardBar: {
     position: "absolute",
     bottom: 48,
     left: 16,
     right: 16,
     backgroundColor: "rgba(0,0,0,0.6)",
     borderRadius: 12,
-    padding: 16,
-    gap: 6,
+    padding: 14,
+    alignItems: "center",
   },
-  title: { color: "#4af", fontSize: 18, fontWeight: "bold", marginBottom: 4 },
-  row: { color: "#ccc", fontSize: 14 },
-  value: { color: "#fff", fontWeight: "bold" },
+  hazardTxt: { color: "#fff", fontSize: 15, fontWeight: "600" },
 });

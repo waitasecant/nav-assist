@@ -53,5 +53,39 @@ export function useSessionLog() {
     );
   };
 
-  return { logEvent, getRecentEvents };
+  const getTierDistribution = async () => {
+    const db = dbRef.current;
+    if (!db) return [];
+    return db.getAllAsync<{ tier: string; count: number }>(
+      "SELECT tier, COUNT(*) as count FROM events GROUP BY tier ORDER BY count DESC"
+    );
+  };
+
+  const getTopHazards = async (limit = 10) => {
+    const db = dbRef.current;
+    if (!db) return [];
+    return db.getAllAsync<{ label: string; count: number }>(
+      "SELECT label, COUNT(*) as count FROM events GROUP BY label ORDER BY count DESC LIMIT ?",
+      limit
+    );
+  };
+
+  const getTimeline = async () => {
+    const db = dbRef.current;
+    if (!db) return [];
+    const since = Date.now() - 30 * 60 * 1000;
+    return db.getAllAsync<{ minute: number; tier: string; count: number }>(
+      `SELECT (ts / 60000) as minute, tier, COUNT(*) as count
+       FROM events WHERE ts >= ? GROUP BY minute, tier ORDER BY minute DESC`,
+      since
+    );
+  };
+
+  const clearHistory = async () => {
+    const db = dbRef.current;
+    if (!db) return;
+    await db.runAsync("DELETE FROM events");
+  };
+
+  return { logEvent, getRecentEvents, getTierDistribution, getTopHazards, getTimeline, clearHistory };
 }
