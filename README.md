@@ -118,7 +118,7 @@ When MiDaS is unavailable the system falls back to bounding-box area ratio.
 │   ├── components/
 │   │   ├── StatsOverlay.tsx                # Status dot (green/red) + live hazard text
 │   │   ├── DashboardScreen.tsx             # In-app dashboard: live stats + event history
-│   │   ├── ConfigScreen.tsx                # Settings UI (confidence, closeness, toggles, description panel)
+│   │   ├── ConfigScreen.tsx                # Settings UI
 │   │   ├── FallAlert.tsx                   # Fall alert with countdown
 │   │   └── PermissionScreen.tsx            # Camera permission prompt
 │   ├── plugins/

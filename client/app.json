@@ -12,7 +12,9 @@
     "android": {
       "package": "com.navassist.app",
       "versionCode": 1,
-      "permissions": ["android.permission.CHANGE_WIFI_MULTICAST_STATE"],
+      "permissions": [
+        "android.permission.CHANGE_WIFI_MULTICAST_STATE"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#ffffff"
@@ -25,11 +27,15 @@
     "plugins": [
       "expo-sqlite",
       "./plugins/withNetworkSecurityConfig",
-      ["expo-splash-screen", {
-        "image": "./assets/splash-icon.png",
-        "imageWidth": 240,
-        "backgroundColor": "#ffffff"
-      }]
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 240,
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-font"
     ],
     "extra": {
       "eas": {
