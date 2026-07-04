@@ -24,7 +24,7 @@ function AppContent() {
   const { config, setConfig } = useConfig();
   const discoveredHosts = useDiscovery();
   const { logEvent, getTierDistribution, getTopHazards, getTimeline, getRecentEvents, clearHistory } = useSessionLog();
-  const { stats, connect, startFpsCounter, stop } = useStreamer(cameraRef, config, logEvent);
+  const { stats, connect, disconnect, startFpsCounter, stop } = useStreamer(cameraRef, config, logEvent);
   const { fallDetected, dismiss, accelMag, fallState } = useFallDetector(config.fallDetection);
 
   useEffect(() => {
@@ -86,7 +86,7 @@ function AppContent() {
         facing="back"
         mute
       />
-      <StatsOverlay {...stats} accelMag={accelMag} fallState={fallState} topInset={insets.top} />
+      <StatsOverlay {...stats} accelMag={accelMag} fallState={fallState} topInset={insets.top} onConnect={connect} onDisconnect={disconnect} />
       <TouchableOpacity style={[styles.iconBtn, { top: btnTop, right: 16 }]} onPress={() => setShowConfig(true)} activeOpacity={0.7}>
         <Ionicons name="settings-outline" size={22} color="#fff" />
       </TouchableOpacity>

@@ -91,9 +91,11 @@ export function useStreamer(
   }, [cameraRef]);
 
   const retryDelayRef = useRef(1000);
+  const manualStopRef = useRef(false);
 
   const connect = useCallback(() => {
-    setStats((s) => ({ ...s, status: "Connecting…" }));
+    manualStopRef.current = false;
+    setStats((s) => ({ ...s, status: "Connecting..." }));
 
     const host = resolveHost(configRef.current.serverIP);
     const ws = new WebSocket(`ws://${host}:${WS_PORT}/ws`);
@@ -102,7 +104,7 @@ export function useStreamer(
     ws.onopen = () => {
       retryDelayRef.current = 1000;
       lastMsgAtRef.current = Date.now();
-      setStats((s) => ({ ...s, status: "Connected ✓" }));
+      setStats((s) => ({ ...s, status: "Connected" }));
       ws.send(JSON.stringify({
         type: "config",
         confidence: configRef.current.confidence,
@@ -129,6 +131,10 @@ export function useStreamer(
       }
       const delay = retryDelayRef.current;
       retryDelayRef.current = Math.min(delay * 2, 30000);
+      if (manualStopRef.current) {
+        setStats((s) => ({ ...s, status: "Disconnected" }));
+        return;
+      }
       setStats((s) => ({ ...s, status: `Disconnected - retrying in ${delay / 1000}s` }));
       setTimeout(connect, delay);
     };
@@ -199,5 +205,11 @@ export function useStreamer(
     wsRef.current?.close();
   }, []);
 
-  return { stats, connect, startFpsCounter, stop };
+  const disconnect = useCallback(() => {
+    manualStopRef.current = true;
+    streamingRef.current = false;
+    wsRef.current?.close();
+  }, []);
+
+  return { stats, connect, disconnect, startFpsCounter, stop };
 }
