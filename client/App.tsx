@@ -24,6 +24,7 @@ function AppContent() {
   const [permission, requestPermission] = useCameraPermissions();
   const permRequestedRef = useRef(false);
   const [permAttempted, setPermAttempted] = useState(false);
+  const [locationSettled, setLocationSettled] = useState(false);
 
   useEffect(() => {
     if (permission && !permission.granted && !permRequestedRef.current) {
@@ -31,7 +32,7 @@ function AppContent() {
       requestPermission().then(() => setPermAttempted(true));
     }
     if (permission?.granted) {
-      Location.requestForegroundPermissionsAsync();
+      Location.requestForegroundPermissionsAsync().then(() => setLocationSettled(true));
     }
   }, [permission?.granted, permission?.canAskAgain]);
   const [showConfig, setShowConfig] = useState(false);
@@ -92,6 +93,8 @@ function AppContent() {
   if (!permission.granted) {
     return <PermissionScreen canAskAgain={permission.canAskAgain} onRequest={requestPermission} />;
   }
+
+  if (!locationSettled) return <View style={styles.container} />;
 
   if (!accountLoaded) return <View style={styles.container} />;
 
