@@ -94,6 +94,11 @@ func (m *Model) RunWithConf(jpegBytes []byte, conf float32) ([]Detection, error)
 	if err != nil {
 		return nil, err
 	}
+	return m.RunImage(img, conf)
+}
+
+// RunImage runs inference on an already-decoded image, skipping JPEG decode.
+func (m *Model) RunImage(img image.Image, conf float32) ([]Detection, error) {
 	origW := img.Bounds().Dx()
 	origH := img.Bounds().Dy()
 

@@ -75,18 +75,23 @@ export function useStreamer(
       if (ws?.readyState === WebSocket.OPEN) {
         try {
           const photo = await Promise.race([
-            cameraRef.current.takePictureAsync({ quality: jpegQualityRef.current, base64: true }),
+            cameraRef.current.takePictureAsync({ quality: jpegQualityRef.current, base64: false }),
             new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error("camera timeout")), 3000)
             ),
           ]);
 
-          if (photo?.base64 && ws.readyState === WebSocket.OPEN) {
+          if (photo?.uri && ws.readyState === WebSocket.OPEN) {
             if (!inFlightRef.current) {
-              inFlightRef.current = true;
-              lastSentAtRef.current = Date.now();
-              ws.send(JSON.stringify({ ts: lastSentAtRef.current, frame: photo.base64 }));
-              frameCountRef.current++;
+              // Fetch the JPEG file as a binary ArrayBuffer to avoid base64 overhead.
+              const res = await fetch(photo.uri);
+              const buf = await res.arrayBuffer();
+              if (ws.readyState === WebSocket.OPEN) {
+                inFlightRef.current = true;
+                lastSentAtRef.current = Date.now();
+                ws.send(buf);
+                frameCountRef.current++;
+              }
             } else {
               droppedCountRef.current++;
             }

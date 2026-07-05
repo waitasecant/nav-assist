@@ -399,56 +399,94 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 		cfg := defaultConnCfg()
 
 		for {
-			_, raw, err := conn.ReadMessage()
+			msgType, raw, err := conn.ReadMessage()
 			if err != nil {
 				slog.Info("client disconnected", "remote", r.RemoteAddr)
 				break
 			}
 
-			var msg incomingMsg
-			if err := json.Unmarshal(raw, &msg); err != nil {
-				continue
-			}
-
-			if msg.Type == "config" {
-				if msg.Confidence > 0 { cfg.Confidence = msg.Confidence }
-				if msg.ImmClose > 0   { cfg.ImmClose   = msg.ImmClose }
-				if msg.CautClose > 0  { cfg.CautClose  = msg.CautClose }
-				if msg.EmergencyTo != "" {
-					cfg.EmergencyTo = msg.EmergencyTo
-					emergencyToMu.Lock()
-					emergencyToLatest = msg.EmergencyTo
-					emergencyToMu.Unlock()
+			// Binary message = raw JPEG frame (no base64 overhead).
+			// Text message = JSON (config or legacy base64 frame).
+			var jpegBytes []byte
+			if msgType == websocket.BinaryMessage {
+				jpegBytes = raw
+			} else {
+				var msg incomingMsg
+				if err := json.Unmarshal(raw, &msg); err != nil {
+					continue
 				}
-				slog.Info("client config updated", "conf", cfg.Confidence, "immClose", cfg.ImmClose, "cautClose", cfg.CautClose)
-				continue
+
+				if msg.Type == "config" {
+					if msg.Confidence > 0 { cfg.Confidence = msg.Confidence }
+					if msg.ImmClose > 0   { cfg.ImmClose   = msg.ImmClose }
+					if msg.CautClose > 0  { cfg.CautClose  = msg.CautClose }
+					if msg.EmergencyTo != "" {
+						cfg.EmergencyTo = msg.EmergencyTo
+						emergencyToMu.Lock()
+						emergencyToLatest = msg.EmergencyTo
+						emergencyToMu.Unlock()
+					}
+					slog.Info("client config updated", "conf", cfg.Confidence, "immClose", cfg.ImmClose, "cautClose", cfg.CautClose)
+					continue
+				}
+
+				if msg.Frame == "" {
+					continue
+				}
+
+				jpegBytes, err = base64.StdEncoding.DecodeString(msg.Frame)
+				if err != nil {
+					continue
+				}
 			}
 
-			if msg.Frame == "" {
-				continue
-			}
-
-			jpegBytes, err := base64.StdEncoding.DecodeString(msg.Frame)
-			if err != nil {
-				continue
-			}
 			storeFrame(jpegBytes)
 
-			inferStart := time.Now()
-			dets, err := model.RunWithConf(jpegBytes, cfg.Confidence)
+			// Decode JPEG once and share with both models.
+			img, err := jpeg.Decode(bytes.NewReader(jpegBytes))
 			if err != nil {
-				slog.Warn("inference error", "err", err)
+				slog.Warn("jpeg decode error", "err", err)
 				continue
 			}
+			imgW := img.Bounds().Dx()
+			imgH := img.Bounds().Dy()
+
+			inferStart := time.Now()
+
+			// Run YOLO and MiDaS in parallel; MiDaS is skipped if YOLO is empty.
+			var (
+				dets      []inference.Detection
+				yoloErr   error
+				closeness []float32
+				depthErr  error
+				wg        sync.WaitGroup
+			)
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				dets, yoloErr = model.RunImage(img, cfg.Confidence)
+			}()
 
 			if depth != nil {
-				cfg2, err := jpeg.DecodeConfig(bytes.NewReader(jpegBytes))
-				if err == nil {
-					if closeness, err := depth.Run(jpegBytes); err == nil {
-						dets = inference.AnnotateDepthWithThresholds(dets, closeness, cfg2.Width, cfg2.Height, cfg.ImmClose, cfg.CautClose)
-					} else {
-						slog.Warn("depth run failed", "err", err)
-					}
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					closeness, depthErr = depth.RunImage(img)
+				}()
+			}
+
+			wg.Wait()
+
+			if yoloErr != nil {
+				slog.Warn("inference error", "err", yoloErr)
+				continue
+			}
+			if depth != nil && len(dets) > 0 {
+				if depthErr != nil {
+					slog.Warn("depth run failed", "err", depthErr)
+				} else {
+					dets = inference.AnnotateDepthWithThresholds(dets, closeness, imgW, imgH, cfg.ImmClose, cfg.CautClose)
 				}
 			}
 

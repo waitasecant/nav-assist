@@ -75,7 +75,11 @@ func (m *DepthModel) Run(jpegBytes []byte) ([]float32, error) {
 	if err != nil {
 		return nil, err
 	}
+	return m.RunImage(img)
+}
 
+// RunImage runs depth estimation on an already-decoded image, skipping JPEG decode.
+func (m *DepthModel) RunImage(img image.Image) ([]float32, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
