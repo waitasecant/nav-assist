@@ -28,6 +28,12 @@
       "expo-sqlite",
       "./plugins/withNetworkSecurityConfig",
       [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "NavAssist needs camera access to detect hazards"
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/splash-icon.png",

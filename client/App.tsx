@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
-import { CameraView, useCameraPermissions } from "expo-camera";
+import { Camera, useCameraDevice, useCameraPermission } from "react-native-vision-camera";
 import * as Location from "expo-location";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStreamer, WS_PORT, resolveHost } from "./hooks/useStreamer";
@@ -20,22 +20,23 @@ import { useAccount } from "./hooks/useAccount";
 
 function AppContent() {
   const insets = useSafeAreaInsets();
-  const cameraRef = useRef<CameraView>(null);
-  const [permission, requestPermission] = useCameraPermissions();
+  const cameraRef = useRef<Camera>(null);
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const device = useCameraDevice('back');
   const permRequestedRef = useRef(false);
   const [permAttempted, setPermAttempted] = useState(false);
   const [locationSettled, setLocationSettled] = useState(false);
 
   useEffect(() => {
-    if (permission && !permission.granted && !permRequestedRef.current) {
+    if (!hasPermission && !permRequestedRef.current) {
       permRequestedRef.current = true;
       requestPermission().then(() => setPermAttempted(true));
     }
-    if (permission?.granted) {
+    if (hasPermission) {
       Location.requestForegroundPermissionsAsync()
         .finally(() => setLocationSettled(true));
     }
-  }, [permission?.granted, permission?.canAskAgain]);
+  }, [hasPermission]);
   const [showConfig, setShowConfig] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [showAccount, setShowAccount] = useState(false);
@@ -89,10 +90,10 @@ function AppContent() {
     } catch (_) {}
   };
 
-  if (!permission || (!permAttempted && !permission.granted)) return <View style={styles.container} />;
+  if (!hasPermission && !permAttempted) return <View style={styles.container} />;
 
-  if (!permission.granted) {
-    return <PermissionScreen canAskAgain={permission.canAskAgain} onRequest={requestPermission} />;
+  if (!hasPermission) {
+    return <PermissionScreen canAskAgain={false} onRequest={requestPermission} />;
   }
 
   if (!locationSettled) return <View style={styles.container} />;
@@ -111,12 +112,16 @@ function AppContent() {
 
   return (
     <View style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        style={[styles.camera, { marginTop: insets.top, marginBottom: insets.bottom }]}
-        facing="back"
-        mute
-      />
+      {device && (
+        <Camera
+          ref={cameraRef}
+          style={[styles.camera, { marginTop: insets.top, marginBottom: insets.bottom }]}
+          device={device}
+          isActive={true}
+          photo={true}
+          audio={false}
+        />
+      )}
       <StatsOverlay {...stats} accelMag={accelMag} fallState={fallState} topInset={insets.top} onConnect={connect} onDisconnect={disconnect} />
       <TouchableOpacity style={[styles.iconBtn, { top: btnTop, right: 16 }]} onPress={() => setShowConfig(true)} activeOpacity={0.7}>
         <Ionicons name="settings-outline" size={22} color="#fff" />

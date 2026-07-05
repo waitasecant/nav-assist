@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-import { CameraView } from "expo-camera";
+import { Camera } from "react-native-vision-camera";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
 import { AppConfig } from "./useConfig";
@@ -25,7 +25,7 @@ export interface Stats {
 }
 
 export function useStreamer(
-  cameraRef: React.RefObject<CameraView | null>,
+  cameraRef: React.RefObject<Camera | null>,
   config: AppConfig,
   emergencyContact: string,
   onHazard?: (tier: string, label: string, depth: number) => void
@@ -75,16 +75,17 @@ export function useStreamer(
       if (ws?.readyState === WebSocket.OPEN) {
         try {
           const photo = await Promise.race([
-            cameraRef.current.takePictureAsync({ quality: jpegQualityRef.current, base64: false }),
+            cameraRef.current.takeSnapshot({ quality: Math.round(jpegQualityRef.current * 100) }),
             new Promise<never>((_, reject) =>
               setTimeout(() => reject(new Error("camera timeout")), 3000)
             ),
           ]);
 
-          if (photo?.uri && ws.readyState === WebSocket.OPEN) {
+          if (photo?.path && ws.readyState === WebSocket.OPEN) {
             if (!inFlightRef.current) {
-              // Fetch the JPEG file as a binary ArrayBuffer to avoid base64 overhead.
-              const res = await fetch(photo.uri);
+              // Read the snapshot file as binary to send as a WebSocket binary frame.
+              const uri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
+              const res = await fetch(uri);
               const buf = await res.arrayBuffer();
               if (ws.readyState === WebSocket.OPEN) {
                 inFlightRef.current = true;
