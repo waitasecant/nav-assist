@@ -393,8 +393,9 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 		}()
 
 		slog.Info("client connected", "remote", r.RemoteAddr)
-		start := time.Now()
 		var count int64
+		// Rolling FPS: timestamps of the last 10 processed frames.
+		fpsTimes := make([]time.Time, 0, 10)
 		last := &commands.LastSpoken{}
 		cfg := defaultConnCfg()
 
@@ -499,7 +500,18 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 			if recordDir != "" {
 				go saveFrame(recordDir, count, jpegBytes, dets)
 			}
-			fps := float32(count) / float32(time.Since(start).Seconds())
+			now := time.Now()
+			fpsTimes = append(fpsTimes, now)
+			if len(fpsTimes) > 10 {
+				fpsTimes = fpsTimes[1:]
+			}
+			var fps float32
+			if len(fpsTimes) >= 2 {
+				elapsed := fpsTimes[len(fpsTimes)-1].Sub(fpsTimes[0]).Seconds()
+				if elapsed > 0 {
+					fps = float32(float64(len(fpsTimes)-1) / elapsed)
+				}
+			}
 			metrics.ServerFPS.Set(float64(fps))
 			cmds := commands.Build(dets, last)
 			updateLatest(fps, count, dets)

@@ -8,6 +8,7 @@ interface Props {
   frameCount: number;
   hazard: string | null;
   dropped: number;
+  serverFps?: number;
   accelMag: number;
   fallState: string;
   topInset: number;

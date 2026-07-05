@@ -22,6 +22,7 @@ export interface Stats {
   frameCount: number;
   hazard: string | null;
   dropped: number;
+  serverFps: number;
 }
 
 export function useStreamer(
@@ -53,6 +54,7 @@ export function useStreamer(
     frameCount: 0,
     hazard: null,
     dropped: 0,
+    serverFps: 0,
   });
 
   const startCapture = useCallback(() => {
@@ -170,7 +172,7 @@ export function useStreamer(
       const win = rttWindowRef.current;
       win.push(rtt);
       if (win.length > 3) win.shift();
-      const avgRtt = win.reduce((a, b) => a + b, 0) / win.length;
+      const avgRtt = Math.round(win.reduce((a, b) => a + b, 0) / win.length);
       captureIntervalRef.current = avgRtt > 400 ? 500 : avgRtt > 150 ? 200 : 100;
       jpegQualityRef.current = avgRtt > 400 ? 0.2 : 0.3;
       const msg = JSON.parse(event.data as string);
@@ -182,7 +184,7 @@ export function useStreamer(
           : `${(top.area_ratio * 100).toFixed(0)}% area`
         : null;
       const hazard = top ? `${top.tier} - ${top.label} (${depthStr})` : null;
-      setStats((s) => ({ ...s, latency: rtt, hazard }));
+      setStats((s) => ({ ...s, latency: avgRtt, hazard, serverFps: msg.server_fps ?? 0 }));
 
       if (top && top.tier !== "AWARE" && onHazard) {
         onHazard(top.tier, top.label, top.depth);

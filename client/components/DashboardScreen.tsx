@@ -79,7 +79,8 @@ export function DashboardScreen({ stats, sessionLog, onClose }: Props) {
           {stats.hazard && <Text style={styles.hazardTxt}>{stats.hazard}</Text>}
           <View style={styles.grid}>
             <StatCard label="RTT"     value={stats.latency != null ? `${stats.latency} ms` : "—"} />
-            <StatCard label="FPS"     value={String(stats.fps)} />
+            <StatCard label="Client FPS" value={String(stats.fps)} />
+            <StatCard label="Server FPS" value={stats.serverFps ? stats.serverFps.toFixed(1) : "—"} />
             <StatCard label="Dropped" value={String(stats.dropped)} />
             <StatCard label="Frames"  value={String(stats.frameCount)} />
           </View>
