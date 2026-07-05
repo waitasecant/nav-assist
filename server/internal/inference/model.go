@@ -40,6 +40,17 @@ type Model struct {
 	mu           sync.Mutex
 }
 
+// newOrtOptions returns session options with full graph optimizations enabled.
+func newOrtOptions() (*ort.SessionOptions, error) {
+	opts, err := ort.NewSessionOptions()
+	if err != nil {
+		return nil, fmt.Errorf("session options: %w", err)
+	}
+	_ = opts.SetGraphOptimizationLevel(ort.GraphOptimizationLevelEnableAll)
+	_ = opts.SetExecutionMode(ort.ExecutionModeParallel)
+	return opts, nil
+}
+
 // New loads a YOLOv8 ONNX model. Call ort.InitializeEnvironment before New.
 func New(modelPath string) (*Model, error) {
 	inShape  := ort.NewShape(1, 3, inputSize, inputSize)
@@ -56,12 +67,20 @@ func New(modelPath string) (*Model, error) {
 		return nil, fmt.Errorf("output tensor: %w", err)
 	}
 
+	opts, err := newOrtOptions()
+	if err != nil {
+		_ = inTensor.Destroy()
+		_ = outTensor.Destroy()
+		return nil, err
+	}
+	defer opts.Destroy()
+
 	session, err := ort.NewAdvancedSession(
 		modelPath,
 		[]string{"images"}, []string{"output0"},
 		[]ort.ArbitraryTensor{inTensor},
 		[]ort.ArbitraryTensor{outTensor},
-		nil,
+		opts,
 	)
 	if err != nil {
 		_ = inTensor.Destroy()

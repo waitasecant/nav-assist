@@ -426,7 +426,10 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 						emergencyToLatest = msg.EmergencyTo
 						emergencyToMu.Unlock()
 					}
-					slog.Info("client config updated", "conf", cfg.Confidence, "immClose", cfg.ImmClose, "cautClose", cfg.CautClose)
+					slog.Info("client config updated",
+					"conf", fmt.Sprintf("%.2f", cfg.Confidence),
+					"immClose", fmt.Sprintf("%.2f", cfg.ImmClose),
+					"cautClose", fmt.Sprintf("%.2f", cfg.CautClose))
 					continue
 				}
 

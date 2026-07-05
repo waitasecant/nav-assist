@@ -42,12 +42,20 @@ func NewDepth(modelPath string) (*DepthModel, error) {
 		return nil, fmt.Errorf("depth output tensor: %w", err)
 	}
 
+	opts, err := newOrtOptions()
+	if err != nil {
+		_ = inTensor.Destroy()
+		_ = outTensor.Destroy()
+		return nil, err
+	}
+	defer opts.Destroy()
+
 	session, err := ort.NewAdvancedSession(
 		modelPath,
 		[]string{"0"}, []string{"797"},
 		[]ort.ArbitraryTensor{inTensor},
 		[]ort.ArbitraryTensor{outTensor},
-		nil,
+		opts,
 	)
 	if err != nil {
 		_ = inTensor.Destroy()
