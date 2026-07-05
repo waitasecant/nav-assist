@@ -150,14 +150,21 @@ var upgrader = websocket.Upgrader{
 
 // connCfg holds per-connection inference thresholds sent by the client.
 type connCfg struct {
-	Confidence float32
-	ImmClose   float32
-	CautClose  float32
+	Confidence  float32
+	ImmClose    float32
+	CautClose   float32
+	EmergencyTo string
 }
 
 func defaultConnCfg() connCfg {
 	return connCfg{Confidence: 0.40, ImmClose: 0.75, CautClose: 0.45}
 }
+
+// emergencyTo is the latest emergency contact number sent by any client.
+var (
+	emergencyToMu sync.RWMutex
+	emergencyToLatest string
+)
 
 // statusSnapshot is the latest inference result, served at /status.
 type statusSnapshot struct {
@@ -315,11 +322,12 @@ func main() {
 }
 
 type incomingMsg struct {
-	Type       string  `json:"type"`
-	Frame      string  `json:"frame"`
-	Confidence float32 `json:"confidence"`
-	ImmClose   float32 `json:"immClose"`
-	CautClose  float32 `json:"cautClose"`
+	Type        string  `json:"type"`
+	Frame       string  `json:"frame"`
+	Confidence  float32 `json:"confidence"`
+	ImmClose    float32 `json:"immClose"`
+	CautClose   float32 `json:"cautClose"`
+	EmergencyTo string  `json:"emergencyTo,omitempty"`
 }
 
 type responseMsg struct {
@@ -406,6 +414,12 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 				if msg.Confidence > 0 { cfg.Confidence = msg.Confidence }
 				if msg.ImmClose > 0   { cfg.ImmClose   = msg.ImmClose }
 				if msg.CautClose > 0  { cfg.CautClose  = msg.CautClose }
+				if msg.EmergencyTo != "" {
+					cfg.EmergencyTo = msg.EmergencyTo
+					emergencyToMu.Lock()
+					emergencyToLatest = msg.EmergencyTo
+					emergencyToMu.Unlock()
+				}
 				slog.Info("client config updated", "conf", cfg.Confidence, "immClose", cfg.ImmClose, "cautClose", cfg.CautClose)
 				continue
 			}
@@ -519,17 +533,25 @@ func fallHandler(w http.ResponseWriter, r *http.Request) {
 	slog.Warn("fall unacknowledged", "location", loc)
 
 	if sid := os.Getenv("TWILIO_SID"); sid != "" {
-		go func() {
-			if err := sendSMS(
-				sid,
-				os.Getenv("TWILIO_TOKEN"),
-				os.Getenv("TWILIO_FROM"),
-				os.Getenv("TWILIO_TO"),
-				fmt.Sprintf("NavAssist: fall detected at %s", loc),
-			); err != nil {
-				slog.Error("twilio send failed", "err", err)
-			}
-		}()
+		emergencyToMu.RLock()
+		to := emergencyToLatest
+		emergencyToMu.RUnlock()
+		if to == "" {
+			to = os.Getenv("TWILIO_TO")
+		}
+		if to != "" {
+			go func() {
+				if err := sendSMS(
+					sid,
+					os.Getenv("TWILIO_TOKEN"),
+					os.Getenv("TWILIO_FROM"),
+					to,
+					fmt.Sprintf("NavAssist: fall detected at %s", loc),
+				); err != nil {
+					slog.Error("twilio send failed", "err", err)
+				}
+			}()
+		}
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

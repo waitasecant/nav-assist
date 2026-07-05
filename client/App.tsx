@@ -14,6 +14,9 @@ import { FallAlert } from "./components/FallAlert";
 import { Ionicons } from "@expo/vector-icons";
 import { ConfigScreen } from "./components/ConfigScreen";
 import { DashboardScreen } from "./components/DashboardScreen";
+import { AccountScreen } from "./components/AccountScreen";
+import { OnboardingScreen } from "./components/OnboardingScreen";
+import { useAccount } from "./hooks/useAccount";
 
 function AppContent() {
   const insets = useSafeAreaInsets();
@@ -33,10 +36,12 @@ function AppContent() {
   }, [permission?.granted, permission?.canAskAgain]);
   const [showConfig, setShowConfig] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
   const { config, setConfig } = useConfig();
+  const { account, setAccount, loaded: accountLoaded } = useAccount();
   const discoveredHosts = useDiscovery();
   const { logEvent, getTierDistribution, getTopHazards, getTimeline, getRecentEvents, clearHistory } = useSessionLog();
-  const { stats, connect, disconnect, startFpsCounter, stop } = useStreamer(cameraRef, config, logEvent);
+  const { stats, connect, disconnect, startFpsCounter, stop } = useStreamer(cameraRef, config, account.emergencyContact, logEvent);
   const { fallDetected, dismiss, accelMag, fallState } = useFallDetector(config.fallDetection);
 
   useEffect(() => {
@@ -88,6 +93,18 @@ function AppContent() {
     return <PermissionScreen canAskAgain={permission.canAskAgain} onRequest={requestPermission} />;
   }
 
+  if (!accountLoaded) return <View style={styles.container} />;
+
+  if (!account.onboardingComplete) {
+    return (
+      <OnboardingScreen
+        onComplete={(name, emergencyContact) =>
+          setAccount({ name, emergencyContact, onboardingComplete: true })
+        }
+      />
+    );
+  }
+
   const btnTop = insets.top + 8;
 
   return (
@@ -105,6 +122,12 @@ function AppContent() {
       <TouchableOpacity style={[styles.iconBtn, { top: btnTop, right: 68 }]} onPress={() => setShowDashboard(true)} activeOpacity={0.7}>
         <Ionicons name="analytics-outline" size={22} color="#fff" />
       </TouchableOpacity>
+      <TouchableOpacity style={[styles.iconBtn, { top: btnTop, right: 120 }]} onPress={() => setShowAccount(true)} activeOpacity={0.7}>
+        <Ionicons name="person-outline" size={22} color="#fff" />
+      </TouchableOpacity>
+      {showAccount && (
+        <AccountScreen account={account} onSave={setAccount} onClose={() => setShowAccount(false)} />
+      )}
       {showConfig && (
         <ConfigScreen config={config} onChange={setConfig} onClose={() => setShowConfig(false)} />
       )}

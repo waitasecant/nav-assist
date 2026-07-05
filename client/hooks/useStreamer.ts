@@ -27,6 +27,7 @@ export interface Stats {
 export function useStreamer(
   cameraRef: React.RefObject<CameraView | null>,
   config: AppConfig,
+  emergencyContact: string,
   onHazard?: (tier: string, label: string, depth: number) => void
 ) {
   const wsRef = useRef<WebSocket | null>(null);
@@ -42,6 +43,8 @@ export function useStreamer(
   const rttWindowRef = useRef<number[]>([]);
   const configRef = useRef(config);
   useEffect(() => { configRef.current = config; }, [config]);
+  const emergencyContactRef = useRef(emergencyContact);
+  useEffect(() => { emergencyContactRef.current = emergencyContact; }, [emergencyContact]);
 
   const [stats, setStats] = useState<Stats>({
     status: "Idle",
@@ -110,6 +113,7 @@ export function useStreamer(
         confidence: configRef.current.confidence,
         immClose: configRef.current.immClose,
         cautClose: configRef.current.cautClose,
+        emergencyTo: emergencyContactRef.current,
       }));
       watchdogRef.current = setInterval(() => {
         if (Date.now() - lastMsgAtRef.current > 10_000) {
