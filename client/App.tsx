@@ -19,6 +19,18 @@ function AppContent() {
   const insets = useSafeAreaInsets();
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
+  const permRequestedRef = useRef(false);
+  const [permAttempted, setPermAttempted] = useState(false);
+
+  useEffect(() => {
+    if (permission && !permission.granted && !permRequestedRef.current) {
+      permRequestedRef.current = true;
+      requestPermission().then(() => setPermAttempted(true));
+    }
+    if (permission?.granted) {
+      Location.requestForegroundPermissionsAsync();
+    }
+  }, [permission?.granted, permission?.canAskAgain]);
   const [showConfig, setShowConfig] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const { config, setConfig } = useConfig();
@@ -70,10 +82,10 @@ function AppContent() {
     } catch (_) {}
   };
 
-  if (!permission) return <View style={styles.container} />;
+  if (!permission || (!permAttempted && !permission.granted)) return <View style={styles.container} />;
 
   if (!permission.granted) {
-    return <PermissionScreen onRequest={requestPermission} />;
+    return <PermissionScreen canAskAgain={permission.canAskAgain} onRequest={requestPermission} />;
   }
 
   const btnTop = insets.top + 8;

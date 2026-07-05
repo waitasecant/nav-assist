@@ -20,7 +20,6 @@ export function useSessionLog() {
         )
       `);
       dbRef.current = db;
-      await Location.requestForegroundPermissionsAsync();
     })();
   }, []);
 
