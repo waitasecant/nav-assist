@@ -48,7 +48,7 @@ func NewDepth(modelPath string) (*DepthModel, error) {
 		_ = outTensor.Destroy()
 		return nil, err
 	}
-	defer opts.Destroy()
+	defer func() { _ = opts.Destroy() }()
 
 	session, err := ort.NewAdvancedSession(
 		modelPath,
