@@ -30,7 +30,11 @@ export function useConfig() {
 
   useEffect(() => {
     AsyncStorage.getItem(KEY).then((json) => {
-      if (json) setConfigState({ ...DEFAULTS, ...JSON.parse(json) });
+      if (json) {
+        const saved = JSON.parse(json);
+        delete saved.serverIP; // serverIP is session-only, not persisted
+        setConfigState({ ...DEFAULTS, ...saved });
+      }
     });
   }, []);
 

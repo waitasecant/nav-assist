@@ -63,7 +63,16 @@ export function useStreamer(
       if (!streamingRef.current) return;
 
       const ws = wsRef.current;
-      if (cameraRef.current && ws?.readyState === WebSocket.OPEN) {
+
+      // Keep the connection alive while waiting for the camera to render.
+      // Without this the watchdog fires after 10 s of no server responses.
+      if (!cameraRef.current) {
+        lastMsgAtRef.current = Date.now();
+        setTimeout(capture, captureIntervalRef.current);
+        return;
+      }
+
+      if (ws?.readyState === WebSocket.OPEN) {
         try {
           const photo = await Promise.race([
             cameraRef.current.takePictureAsync({ quality: jpegQualityRef.current, base64: true }),

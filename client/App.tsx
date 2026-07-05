@@ -32,7 +32,8 @@ function AppContent() {
       requestPermission().then(() => setPermAttempted(true));
     }
     if (permission?.granted) {
-      Location.requestForegroundPermissionsAsync().then(() => setLocationSettled(true));
+      Location.requestForegroundPermissionsAsync()
+        .finally(() => setLocationSettled(true));
     }
   }, [permission?.granted, permission?.canAskAgain]);
   const [showConfig, setShowConfig] = useState(false);
@@ -62,12 +63,12 @@ function AppContent() {
   }, [discoveredHosts]);
 
   // Reconnect when serverIP is set for the first time (e.g. mDNS auto-fill).
-  // The initial connect() used 127.0.0.1; now we have a real host.
+  // Only switch if not already connected — avoids killing a working adb-reverse tunnel.
   const prevServerIP = useRef(config.serverIP);
   useEffect(() => {
     const prev = prevServerIP.current;
     prevServerIP.current = config.serverIP;
-    if (prev === "" && config.serverIP !== "") {
+    if (prev === "" && config.serverIP !== "" && !stats.status.startsWith("Connect")) {
       stop();
       connect();
     }
@@ -96,9 +97,7 @@ function AppContent() {
 
   if (!locationSettled) return <View style={styles.container} />;
 
-  if (!accountLoaded) return <View style={styles.container} />;
-
-  if (!account.onboardingComplete) {
+  if (!accountLoaded || !account.onboardingComplete) {
     return (
       <OnboardingScreen
         onComplete={(name, emergencyContact) =>
