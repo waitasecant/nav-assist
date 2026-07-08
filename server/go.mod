@@ -7,7 +7,7 @@ require (
 	github.com/grandcat/zeroconf v1.0.0
 	github.com/mdp/qrterminal/v3 v3.2.1
 	github.com/prometheus/client_golang v1.23.2
-	github.com/yalue/onnxruntime_go v1.31.0
+	github.com/yalue/onnxruntime_go v1.24.0
 	golang.org/x/image v0.43.0
 	modernc.org/sqlite v1.53.0
 )

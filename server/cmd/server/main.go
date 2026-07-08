@@ -46,6 +46,7 @@ type config struct {
 	port           string
 	logPath        string
 	recordDir      string
+	useDirectML    bool
 }
 
 func parseConfig() config {
@@ -56,7 +57,11 @@ func parseConfig() config {
 	flag.StringVar(&cfg.port,           "port",        "8000",                      "listen port")
 	flag.StringVar(&cfg.logPath,        "log",         "session.db",                "path to SQLite session log")
 	flag.StringVar(&cfg.recordDir,      "record",      "",                          "directory for frame recordings (empty = disabled)")
+	flag.BoolVar(&cfg.useDirectML,      "directml",    false,                        "use DirectML GPU execution provider (requires DirectML-enabled ORT DLL)")
 	flag.Parse()
+	if cfg.useDirectML && cfg.ortLib == defaultOrtLib {
+		cfg.ortLib = "lib/onnxruntime-directml.dll"
+	}
 	return cfg
 }
 
@@ -248,7 +253,7 @@ func main() {
 	}
 	defer func() { _ = ort.DestroyEnvironment() }()
 
-	model, err := inference.New(cfg.modelPath)
+	model, err := inference.New(cfg.modelPath, cfg.useDirectML)
 	if err != nil {
 		slog.Error("load model failed", "path", cfg.modelPath, "err", err)
 		return
@@ -256,7 +261,7 @@ func main() {
 	defer model.Close()
 
 	var depthModel *inference.DepthModel
-	if dm, err := inference.NewDepth(cfg.depthModelPath); err != nil {
+	if dm, err := inference.NewDepth(cfg.depthModelPath, cfg.useDirectML); err != nil {
 		slog.Warn("depth model unavailable, falling back to area ratio", "err", err)
 	} else {
 		depthModel = dm

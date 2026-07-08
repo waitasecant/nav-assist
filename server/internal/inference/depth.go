@@ -27,7 +27,7 @@ type DepthModel struct {
 }
 
 // NewDepth loads a MiDaS v2.1 small ONNX model.
-func NewDepth(modelPath string) (*DepthModel, error) {
+func NewDepth(modelPath string, useDirectML bool) (*DepthModel, error) {
 	inShape  := ort.NewShape(1, 3, depthSize, depthSize)
 	outShape := ort.NewShape(1, depthSize, depthSize)
 
@@ -42,7 +42,7 @@ func NewDepth(modelPath string) (*DepthModel, error) {
 		return nil, fmt.Errorf("depth output tensor: %w", err)
 	}
 
-	opts, err := newOrtOptions()
+	opts, err := newOrtOptions(useDirectML)
 	if err != nil {
 		_ = inTensor.Destroy()
 		_ = outTensor.Destroy()

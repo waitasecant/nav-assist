@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	inputSize  = 640
+	inputSize  = 320
 	numClasses = 80
-	numAnchors = 8400
+	numAnchors = 2100
 	confThresh = float32(0.40)
 	iouThresh  = float32(0.45)
 	immThresh  = float32(0.45)
@@ -41,18 +41,24 @@ type Model struct {
 }
 
 // newOrtOptions returns session options with full graph optimizations enabled.
-func newOrtOptions() (*ort.SessionOptions, error) {
+// If useDirectML is true, appends the DirectML execution provider (device 0).
+func newOrtOptions(useDirectML bool) (*ort.SessionOptions, error) {
 	opts, err := ort.NewSessionOptions()
 	if err != nil {
 		return nil, fmt.Errorf("session options: %w", err)
 	}
 	_ = opts.SetGraphOptimizationLevel(ort.GraphOptimizationLevelEnableAll)
 	_ = opts.SetExecutionMode(ort.ExecutionModeParallel)
+	if useDirectML {
+		if err := opts.AppendExecutionProviderDirectML(0); err != nil {
+			return nil, fmt.Errorf("DirectML EP: %w", err)
+		}
+	}
 	return opts, nil
 }
 
 // New loads a YOLOv8 ONNX model. Call ort.InitializeEnvironment before New.
-func New(modelPath string) (*Model, error) {
+func New(modelPath string, useDirectML bool) (*Model, error) {
 	inShape  := ort.NewShape(1, 3, inputSize, inputSize)
 	outShape := ort.NewShape(1, numClasses+4, numAnchors)
 
@@ -67,7 +73,7 @@ func New(modelPath string) (*Model, error) {
 		return nil, fmt.Errorf("output tensor: %w", err)
 	}
 
-	opts, err := newOrtOptions()
+	opts, err := newOrtOptions(useDirectML)
 	if err != nil {
 		_ = inTensor.Destroy()
 		_ = outTensor.Destroy()
