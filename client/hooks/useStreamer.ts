@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { Camera } from "react-native-vision-camera";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
+import RNBlobUtil from "react-native-blob-util";
 import { AppConfig } from "./useConfig";
 
 // Config
@@ -86,10 +87,8 @@ export function useStreamer(
 
           if (photo?.path && ws.readyState === WebSocket.OPEN) {
             if (inFlightCountRef.current < maxInFlightRef.current) {
-              // Read the snapshot file as binary to send as a WebSocket binary frame.
-              const uri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
-              const res = await fetch(uri);
-              const buf = await res.arrayBuffer();
+              const b64 = await RNBlobUtil.fs.readFile(photo.path, 'base64') as string;
+              const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
               if (ws.readyState === WebSocket.OPEN) {
                 inFlightCountRef.current++;
                 sentTimesRef.current.push(Date.now());
@@ -183,7 +182,7 @@ export function useStreamer(
       win.push(rtt);
       if (win.length > 3) win.shift();
       const avgRtt = Math.round(win.reduce((a, b) => a + b, 0) / win.length);
-      captureIntervalRef.current = avgRtt > 400 ? 500 : avgRtt > 150 ? 200 : avgRtt > 80 ? 100 : 50;
+      captureIntervalRef.current = avgRtt > 400 ? 500 : avgRtt > 250 ? 300 : avgRtt > 160 ? 200 : avgRtt > 100 ? 150 : avgRtt > 80 ? 100 : 50;
       jpegQualityRef.current = avgRtt > 400 ? 0.2 : 0.3;
 
       const top = msg.detections?.[0] ?? null;

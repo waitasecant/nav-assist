@@ -1,5 +1,10 @@
 # NavAssist Go server startup script
 # Run from the server/ directory: .\start.ps1
+# Flags: -ForceCPU  force CPU-only mode even when a GPU is detected
+
+param(
+    [switch]$ForceCPU
+)
 
 $ORT_VERSION     = "1.26.0"
 $ORT_URL         = "https://github.com/microsoft/onnxruntime/releases/download/v$ORT_VERSION/onnxruntime-win-x64-$ORT_VERSION.zip"
@@ -10,15 +15,19 @@ $BINARY          = "navassist.exe"
 
 Write-Host "`nNavAssist - Go Server" -ForegroundColor Cyan
 
-# GPU detection — skip Basic Display / virtual adapters
+# GPU detection - skip Basic Display / virtual adapters
 $gpuName = $null
-$gpus = Get-WmiObject Win32_VideoController -ErrorAction SilentlyContinue |
-    Where-Object { $_.Name -notmatch "Microsoft Basic Display|Remote Desktop|Citrix|VMware|VirtualBox|Hyper-V" }
-if ($gpus) {
-    $gpuName = ($gpus | Select-Object -First 1).Name
-    Write-Host "GPU detected: $gpuName" -ForegroundColor Green
+if ($ForceCPU) {
+    Write-Host "CPU mode forced (-ForceCPU)." -ForegroundColor Yellow
 } else {
-    Write-Host "No discrete/integrated GPU detected — running in CPU mode." -ForegroundColor Yellow
+    $gpus = Get-WmiObject Win32_VideoController -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notmatch "Microsoft Basic Display|Remote Desktop|Citrix|VMware|VirtualBox|Hyper-V" }
+    if ($gpus) {
+        $gpuName = ($gpus | Select-Object -First 1).Name
+        Write-Host "GPU detected: $gpuName" -ForegroundColor Green
+    } else {
+        Write-Host "No discrete/integrated GPU detected - running in CPU mode." -ForegroundColor Yellow
+    }
 }
 $useGPU = $null -ne $gpuName
 
