@@ -1,12 +1,26 @@
 # NavAssist Go server startup script
 # Run from the server/ directory: .\start.ps1
 
-$ORT_VERSION = "1.26.0"
-$ORT_URL     = "https://github.com/microsoft/onnxruntime/releases/download/v$ORT_VERSION/onnxruntime-win-x64-$ORT_VERSION.zip"
-$ORT_DLL     = "lib\onnxruntime.dll"
-$BINARY      = "navassist.exe"
+$ORT_VERSION     = "1.26.0"
+$ORT_URL         = "https://github.com/microsoft/onnxruntime/releases/download/v$ORT_VERSION/onnxruntime-win-x64-$ORT_VERSION.zip"
+$ORT_DML_URL     = "https://www.nuget.org/api/v2/package/Microsoft.ML.OnnxRuntime.DirectML/$ORT_VERSION"
+$ORT_DLL         = "lib\onnxruntime.dll"
+$ORT_DML_DLL     = "lib\onnxruntime-directml.dll"
+$BINARY          = "navassist.exe"
 
 Write-Host "`nNavAssist - Go Server" -ForegroundColor Cyan
+
+# GPU detection — skip Basic Display / virtual adapters
+$gpuName = $null
+$gpus = Get-WmiObject Win32_VideoController -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -notmatch "Microsoft Basic Display|Remote Desktop|Citrix|VMware|VirtualBox|Hyper-V" }
+if ($gpus) {
+    $gpuName = ($gpus | Select-Object -First 1).Name
+    Write-Host "GPU detected: $gpuName" -ForegroundColor Green
+} else {
+    Write-Host "No discrete/integrated GPU detected — running in CPU mode." -ForegroundColor Yellow
+}
+$useGPU = $null -ne $gpuName
 
 # Check for Go
 if (-not (Get-Command go -ErrorAction SilentlyContinue)) {
@@ -34,7 +48,7 @@ if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
     exit 1
 }
 
-# Download ORT shared library if missing
+# Download standard ORT DLL if missing
 if (-not (Test-Path $ORT_DLL)) {
     Write-Host "Downloading ORT v$ORT_VERSION DLL (~8 MB)..." -ForegroundColor Green
     New-Item -ItemType Directory -Force lib | Out-Null
@@ -47,12 +61,32 @@ if (-not (Test-Path $ORT_DLL)) {
     Write-Host "ORT DLL ready." -ForegroundColor Green
 }
 
+# Download DirectML ORT DLL if GPU is available and DLL is missing
+if ($useGPU -and -not (Test-Path $ORT_DML_DLL)) {
+    Write-Host "Downloading ORT DirectML v$ORT_VERSION DLL..." -ForegroundColor Green
+    New-Item -ItemType Directory -Force lib | Out-Null
+    $nupkg = "ort_dml_tmp.nupkg"
+    Invoke-WebRequest -Uri $ORT_DML_URL -OutFile $nupkg
+    Expand-Archive $nupkg -DestinationPath ort_dml_tmp -Force
+    Copy-Item "ort_dml_tmp\runtimes\win-x64\native\onnxruntime.dll" $ORT_DML_DLL
+    Remove-Item $nupkg, ort_dml_tmp -Recurse -Force
+    Write-Host "DirectML DLL ready." -ForegroundColor Green
+}
+
 # Check YOLO model exists
-$MODEL = "..\model\yolov8n.onnx"
-if (-not (Test-Path $MODEL)) {
+$MODEL_FP32 = "..\model\yolov8n.onnx"
+$MODEL_INT8 = "..\model\yolov8n_int8.onnx"
+if (-not (Test-Path $MODEL_FP32)) {
     Write-Host "ERROR: model\yolov8n.onnx not found." -ForegroundColor Red
     Write-Host "Run .\setup.ps1 from the tools\ directory to export it." -ForegroundColor Yellow
     exit 1
+}
+
+# Choose model: prefer INT8 if available, fall back to FP32
+$modelPath = $MODEL_FP32
+if (Test-Path $MODEL_INT8) {
+    $modelPath = $MODEL_INT8
+    Write-Host "Using INT8 quantized model." -ForegroundColor Green
 }
 
 # Download MiDaS depth model if missing
@@ -82,6 +116,12 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Build OK." -ForegroundColor Green
 
 # Run
-Write-Host "Starting server on 0.0.0.0:8000 ..." -ForegroundColor Green
+$runArgs = @("-model", $modelPath)
+if ($useGPU) {
+    Write-Host "Starting server with DirectML GPU acceleration (max in-flight: 5)..." -ForegroundColor Green
+    $runArgs += "-directml"
+} else {
+    Write-Host "Starting server in CPU mode (max in-flight: 2)..." -ForegroundColor Green
+}
 Write-Host "Waiting for phone to connect. Press Ctrl+C to stop.`n" -ForegroundColor Green
-& ".\$BINARY"
+& ".\$BINARY" @runArgs

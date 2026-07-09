@@ -6,7 +6,6 @@ import { AppConfig } from "./useConfig";
 
 // Config
 const WS_PORT = 8000;
-const MAX_IN_FLIGHT = 2;
 
 export { WS_PORT };
 
@@ -36,6 +35,7 @@ export function useStreamer(
   const frameCountRef = useRef(0);
   const streamingRef = useRef(false);
   const inFlightCountRef = useRef(0);
+  const maxInFlightRef = useRef(2);
   const sentTimesRef = useRef<number[]>([]);
   const lastMsgAtRef = useRef(0);
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -85,7 +85,7 @@ export function useStreamer(
           ]);
 
           if (photo?.path && ws.readyState === WebSocket.OPEN) {
-            if (inFlightCountRef.current < MAX_IN_FLIGHT) {
+            if (inFlightCountRef.current < maxInFlightRef.current) {
               // Read the snapshot file as binary to send as a WebSocket binary frame.
               const uri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
               const res = await fetch(uri);
@@ -144,6 +144,7 @@ export function useStreamer(
     ws.onclose = (_event) => {
       streamingRef.current = false;
       inFlightCountRef.current = 0;
+      maxInFlightRef.current = 2;
       sentTimesRef.current = [];
       captureIntervalRef.current = 100;
       jpegQualityRef.current = 0.3;
@@ -164,11 +165,17 @@ export function useStreamer(
 
     ws.onerror = () => {
       inFlightCountRef.current = 0;
+      maxInFlightRef.current = 2;
       sentTimesRef.current = [];
       setStats((s) => ({ ...s, status: "Connection error" }));
     };
 
     ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data as string);
+      if (msg.type === "handshake") {
+        maxInFlightRef.current = msg.max_in_flight;
+        return;
+      }
       inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       lastMsgAtRef.current = Date.now();
       const rtt = Date.now() - (sentTimesRef.current.shift() ?? Date.now());
@@ -178,7 +185,6 @@ export function useStreamer(
       const avgRtt = Math.round(win.reduce((a, b) => a + b, 0) / win.length);
       captureIntervalRef.current = avgRtt > 400 ? 500 : avgRtt > 150 ? 200 : avgRtt > 80 ? 100 : 50;
       jpegQualityRef.current = avgRtt > 400 ? 0.2 : 0.3;
-      const msg = JSON.parse(event.data as string);
 
       const top = msg.detections?.[0] ?? null;
       const depthStr = top

@@ -47,6 +47,7 @@ type config struct {
 	logPath        string
 	recordDir      string
 	useDirectML    bool
+	maxInFlight    int
 }
 
 func parseConfig() config {
@@ -61,6 +62,10 @@ func parseConfig() config {
 	flag.Parse()
 	if cfg.useDirectML && cfg.ortLib == defaultOrtLib {
 		cfg.ortLib = "lib/onnxruntime-directml.dll"
+	}
+	cfg.maxInFlight = 2
+	if cfg.useDirectML {
+		cfg.maxInFlight = 5
 	}
 	return cfg
 }
@@ -238,8 +243,14 @@ func main() {
 	cfg := parseConfig()
 
 	// Auto-download models from release if missing.
+	// Only known release artifacts are eligible; custom paths must be provided manually.
 	if releaseBase != "" {
-		if err := ensureModel(cfg.modelPath, releaseBase+"/yolov8n.onnx"); err != nil {
+		knownModels := map[string]string{
+			"yolov8n.onnx":      releaseBase + "/yolov8n.onnx",
+			"yolov8n_int8.onnx": releaseBase + "/yolov8n_int8.onnx",
+		}
+		modelURL := knownModels[filepath.Base(cfg.modelPath)]
+		if err := ensureModel(cfg.modelPath, modelURL); err != nil {
 			slog.Error("model unavailable", "err", err)
 			return
 		}
@@ -288,7 +299,7 @@ func main() {
 	}
 
 	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/ws", makeHandler(model, depthModel, log, cfg.recordDir))
+	http.HandleFunc("/ws", makeHandler(model, depthModel, log, cfg.recordDir, cfg.maxInFlight))
 	http.HandleFunc("/status", statusHandler)
 	http.HandleFunc("/dashboard", dashboardHandler)
 	http.HandleFunc("/fall", fallHandler)
@@ -335,6 +346,11 @@ type incomingMsg struct {
 	EmergencyTo string  `json:"emergencyTo,omitempty"`
 }
 
+type handshakeMsg struct {
+	Type        string `json:"type"`
+	MaxInFlight int    `json:"max_in_flight"`
+}
+
 type responseMsg struct {
 	ReceivedAt float64               `json:"received_at"`
 	FrameCount int64                 `json:"frame_count"`
@@ -359,7 +375,7 @@ const (
 	pongWait     = 5 * time.Second
 )
 
-func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logger.Logger, recordDir string) http.HandlerFunc {
+func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logger.Logger, recordDir string, maxInFlight int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -378,6 +394,10 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 		_ = conn.SetReadDeadline(time.Now().Add(pingInterval + pongWait))
 
 		var writeMu sync.Mutex
+
+		writeMu.Lock()
+		_ = conn.WriteJSON(handshakeMsg{Type: "handshake", MaxInFlight: maxInFlight})
+		writeMu.Unlock()
 
 		go func() {
 			ticker := time.NewTicker(pingInterval)

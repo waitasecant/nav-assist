@@ -35,15 +35,13 @@ else:
     print(f"[✓] Exported to: {TARGET}")
 
 if args.quantize:
-    from onnxruntime.quantization import quantize_dynamic, QuantType
-
-    def quantize(src: Path, dst: Path) -> None:
-        if dst.exists():
-            print(f"[✓] Already quantized: {dst}")
-            return
-        print(f"[*] Quantizing {src.name} → {dst.name}...")
-        quantize_dynamic(str(src), str(dst), weight_type=QuantType.QUInt8)
+    dst = MODEL_DIR / "yolov8n_int8.onnx"
+    if dst.exists():
+        print(f"[✓] Already exported: {dst}")
+    else:
+        print("[*] Exporting INT8 model (ultralytics native calibration on COCO)...")
+        q_model = YOLO("yolov8n.pt")
+        exported = Path(q_model.export(format="onnx", imgsz=320, opset=12, int8=True))
+        shutil.move(str(exported), str(dst))
         size_mb = dst.stat().st_size / 1_048_576
         print(f"[✓] {dst.name}  ({size_mb:.1f} MB)")
-
-    quantize(MODEL_DIR / "yolov8n.onnx", MODEL_DIR / "yolov8n_int8.onnx")
