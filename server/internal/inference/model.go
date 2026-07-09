@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
+	"log/slog"
 	"sort"
 	"sync"
 
@@ -41,24 +42,33 @@ type Model struct {
 }
 
 // newOrtOptions returns session options with full graph optimizations enabled.
-// If useDirectML is true, appends the DirectML execution provider (device 0).
-func newOrtOptions(useDirectML bool) (*ort.SessionOptions, error) {
+// useCUDA takes priority over useDirectML. EP failures are non-fatal — ORT
+// falls back to the CPU provider automatically.
+func newOrtOptions(useDirectML, useCUDA bool) (*ort.SessionOptions, error) {
 	opts, err := ort.NewSessionOptions()
 	if err != nil {
 		return nil, fmt.Errorf("session options: %w", err)
 	}
 	_ = opts.SetGraphOptimizationLevel(ort.GraphOptimizationLevelEnableAll)
 	_ = opts.SetExecutionMode(ort.ExecutionModeParallel)
-	if useDirectML {
+	if useCUDA {
+		if cudaOpts, err := ort.NewCUDAProviderOptions(); err != nil {
+			slog.Warn("CUDA EP unavailable, falling back to CPU", "err", err)
+		} else if err := opts.AppendExecutionProviderCUDA(cudaOpts); err != nil {
+			slog.Warn("CUDA EP failed, falling back to CPU", "err", err)
+		} else {
+			slog.Info("CUDA EP enabled")
+		}
+	} else if useDirectML {
 		if err := opts.AppendExecutionProviderDirectML(0); err != nil {
-			return nil, fmt.Errorf("DirectML EP: %w", err)
+			slog.Warn("DirectML EP unavailable, falling back to CPU", "err", err)
 		}
 	}
 	return opts, nil
 }
 
 // New loads a YOLOv8 ONNX model. Call ort.InitializeEnvironment before New.
-func New(modelPath string, useDirectML bool) (*Model, error) {
+func New(modelPath string, useDirectML, useCUDA bool) (*Model, error) {
 	inShape  := ort.NewShape(1, 3, inputSize, inputSize)
 	outShape := ort.NewShape(1, numClasses+4, numAnchors)
 
@@ -73,7 +83,7 @@ func New(modelPath string, useDirectML bool) (*Model, error) {
 		return nil, fmt.Errorf("output tensor: %w", err)
 	}
 
-	opts, err := newOrtOptions(useDirectML)
+	opts, err := newOrtOptions(useDirectML, useCUDA)
 	if err != nil {
 		_ = inTensor.Destroy()
 		_ = outTensor.Destroy()
@@ -144,7 +154,7 @@ func (m *Model) RunImage(img image.Image, conf float32) ([]Detection, error) {
 // tensor (normalised to [0,1]) into buf.
 func preprocess(img image.Image, buf []float32) {
 	dst := image.NewRGBA(image.Rect(0, 0, inputSize, inputSize))
-	draw.BiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Over, nil)
+	draw.NearestNeighbor.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Over, nil)
 
 	pix   := dst.Pix
 	plane := inputSize * inputSize

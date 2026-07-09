@@ -47,7 +47,7 @@ func main() {
 	}
 	defer func() { _ = ort.DestroyEnvironment() }()
 
-	model, err := inference.New(*modelPath, false)
+	model, err := inference.New(*modelPath, false, false)
 	if err != nil {
 		slog.Error("load model failed", "err", err)
 		return

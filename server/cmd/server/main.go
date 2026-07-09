@@ -47,6 +47,7 @@ type config struct {
 	logPath        string
 	recordDir      string
 	useDirectML    bool
+	useCUDA        bool
 	maxInFlight    int
 }
 
@@ -58,13 +59,16 @@ func parseConfig() config {
 	flag.StringVar(&cfg.port,           "port",        "8000",                      "listen port")
 	flag.StringVar(&cfg.logPath,        "log",         "session.db",                "path to SQLite session log")
 	flag.StringVar(&cfg.recordDir,      "record",      "",                          "directory for frame recordings (empty = disabled)")
-	flag.BoolVar(&cfg.useDirectML,      "directml",    false,                        "use DirectML GPU execution provider (requires DirectML-enabled ORT DLL)")
+	flag.BoolVar(&cfg.useDirectML,      "directml",    false,  						"use DirectML GPU execution provider (requires DirectML-enabled ORT DLL)")
+	flag.BoolVar(&cfg.useCUDA,          "cuda",        false,  						"use CUDA execution provider (requires CUDA-enabled ORT DLL and CUDA runtime)")
 	flag.Parse()
-	if cfg.useDirectML && cfg.ortLib == defaultOrtLib {
+	if cfg.useCUDA && cfg.ortLib == defaultOrtLib {
+		cfg.ortLib = "lib/onnxruntime-cuda.dll"
+	} else if cfg.useDirectML && cfg.ortLib == defaultOrtLib {
 		cfg.ortLib = "lib/onnxruntime-directml.dll"
 	}
 	cfg.maxInFlight = 2
-	if cfg.useDirectML {
+	if cfg.useDirectML || cfg.useCUDA {
 		cfg.maxInFlight = 5
 	}
 	return cfg
@@ -264,7 +268,7 @@ func main() {
 	}
 	defer func() { _ = ort.DestroyEnvironment() }()
 
-	model, err := inference.New(cfg.modelPath, cfg.useDirectML)
+	model, err := inference.New(cfg.modelPath, cfg.useDirectML, cfg.useCUDA)
 	if err != nil {
 		slog.Error("load model failed", "path", cfg.modelPath, "err", err)
 		return
@@ -272,7 +276,7 @@ func main() {
 	defer model.Close()
 
 	var depthModel *inference.DepthModel
-	if dm, err := inference.NewDepth(cfg.depthModelPath, cfg.useDirectML); err != nil {
+	if dm, err := inference.NewDepth(cfg.depthModelPath, cfg.useDirectML, cfg.useCUDA); err != nil {
 		slog.Warn("depth model unavailable, falling back to area ratio", "err", err)
 	} else {
 		depthModel = dm
