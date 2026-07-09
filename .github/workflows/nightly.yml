@@ -5,6 +5,9 @@ on:
     - cron: "0 2 * * *"  # 02:00 UTC daily
   workflow_dispatch:       # allow manual trigger
 
+permissions:
+  contents: read
+
 jobs:
   export:
     name: Export ONNX models & publish release
