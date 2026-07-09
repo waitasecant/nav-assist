@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { Camera } from "react-native-vision-camera";
 import * as Haptics from "expo-haptics";
 import * as Speech from "expo-speech";
+import RNBlobUtil from "react-native-blob-util";
 import { AppConfig } from "./useConfig";
 
 // Config
@@ -32,10 +33,11 @@ export function useStreamer(
   onHazard?: (tier: string, label: string, depth: number) => void
 ) {
   const wsRef = useRef<WebSocket | null>(null);
-  const lastSentAtRef = useRef<number>(0);
   const frameCountRef = useRef(0);
   const streamingRef = useRef(false);
-  const inFlightRef = useRef(false);
+  const inFlightCountRef = useRef(0);
+  const maxInFlightRef = useRef(2);
+  const sentTimesRef = useRef<number[]>([]);
   const lastMsgAtRef = useRef(0);
   const watchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const droppedCountRef = useRef(0);
@@ -84,14 +86,12 @@ export function useStreamer(
           ]);
 
           if (photo?.path && ws.readyState === WebSocket.OPEN) {
-            if (!inFlightRef.current) {
-              // Read the snapshot file as binary to send as a WebSocket binary frame.
-              const uri = photo.path.startsWith('file://') ? photo.path : `file://${photo.path}`;
-              const res = await fetch(uri);
-              const buf = await res.arrayBuffer();
+            if (inFlightCountRef.current < maxInFlightRef.current) {
+              const b64 = await RNBlobUtil.fs.readFile(photo.path, 'base64') as string;
+              const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
               if (ws.readyState === WebSocket.OPEN) {
-                inFlightRef.current = true;
-                lastSentAtRef.current = Date.now();
+                inFlightCountRef.current++;
+                sentTimesRef.current.push(Date.now());
                 ws.send(buf);
                 frameCountRef.current++;
               }
@@ -142,7 +142,9 @@ export function useStreamer(
 
     ws.onclose = (_event) => {
       streamingRef.current = false;
-      inFlightRef.current = false;
+      inFlightCountRef.current = 0;
+      maxInFlightRef.current = 2;
+      sentTimesRef.current = [];
       captureIntervalRef.current = 100;
       jpegQualityRef.current = 0.3;
       rttWindowRef.current = [];
@@ -161,21 +163,27 @@ export function useStreamer(
     };
 
     ws.onerror = () => {
-      inFlightRef.current = false;
+      inFlightCountRef.current = 0;
+      maxInFlightRef.current = 2;
+      sentTimesRef.current = [];
       setStats((s) => ({ ...s, status: "Connection error" }));
     };
 
     ws.onmessage = (event) => {
-      inFlightRef.current = false;
+      const msg = JSON.parse(event.data as string);
+      if (msg.type === "handshake") {
+        maxInFlightRef.current = msg.max_in_flight;
+        return;
+      }
+      inFlightCountRef.current = Math.max(0, inFlightCountRef.current - 1);
       lastMsgAtRef.current = Date.now();
-      const rtt = Date.now() - lastSentAtRef.current;
+      const rtt = Date.now() - (sentTimesRef.current.shift() ?? Date.now());
       const win = rttWindowRef.current;
       win.push(rtt);
       if (win.length > 3) win.shift();
       const avgRtt = Math.round(win.reduce((a, b) => a + b, 0) / win.length);
-      captureIntervalRef.current = avgRtt > 400 ? 500 : avgRtt > 150 ? 200 : 100;
+      captureIntervalRef.current = avgRtt > 400 ? 500 : avgRtt > 250 ? 300 : avgRtt > 160 ? 200 : avgRtt > 100 ? 150 : avgRtt > 80 ? 100 : 50;
       jpegQualityRef.current = avgRtt > 400 ? 0.2 : 0.3;
-      const msg = JSON.parse(event.data as string);
 
       const top = msg.detections?.[0] ?? null;
       const depthStr = top

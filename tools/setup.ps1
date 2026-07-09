@@ -18,7 +18,7 @@ Write-Host "Installing dependencies..." -ForegroundColor Green
 pip install -r requirements.txt
 
 Write-Host "Running export..." -ForegroundColor Green
-python export.py
+python export.py --quantize
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Export failed. Check output above." -ForegroundColor Red
     exit 1

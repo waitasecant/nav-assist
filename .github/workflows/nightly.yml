@@ -20,7 +20,7 @@ jobs:
         run: pip install --quiet -r tools/requirements.txt
 
       - name: Export YOLO model
-        run: python tools/export.py
+        run: python tools/export.py --quantize
 
       - name: Download MiDaS model
         run: |
@@ -39,5 +39,6 @@ jobs:
           name: onnx-models-${{ github.run_id }}
           path: |
             model/yolov8n.onnx
+            model/yolov8n_int8.onnx
             model/midas_small.onnx
           retention-days: 30

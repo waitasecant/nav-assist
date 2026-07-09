@@ -17,12 +17,12 @@ def test_yolo():
     session = ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
     input_name = session.get_inputs()[0].name
 
-    dummy = np.zeros((1, 3, 640, 640), dtype=np.float32)
+    dummy = np.zeros((1, 3, 320, 320), dtype=np.float32)
     outputs = session.run(None, {input_name: dummy})
 
-    # YOLOv8-nano: [1, 84, 8400]  (4 box coords + 80 classes, 8400 anchors)
+    # YOLOv8-nano @ 320px: [1, 84, 2100]  (4 box coords + 80 classes, 2100 anchors)
     shape = tuple(outputs[0].shape)
-    assert shape == (1, 84, 8400), f"Unexpected YOLO output shape: {shape}"
+    assert shape == (1, 84, 2100), f"Unexpected YOLO output shape: {shape}"
     print(f"[✓] yolov8n.onnx  output shape: {shape}")
 
 

@@ -27,7 +27,7 @@ type DepthModel struct {
 }
 
 // NewDepth loads a MiDaS v2.1 small ONNX model.
-func NewDepth(modelPath string) (*DepthModel, error) {
+func NewDepth(modelPath string, useDirectML, useCUDA bool) (*DepthModel, error) {
 	inShape  := ort.NewShape(1, 3, depthSize, depthSize)
 	outShape := ort.NewShape(1, depthSize, depthSize)
 
@@ -42,7 +42,7 @@ func NewDepth(modelPath string) (*DepthModel, error) {
 		return nil, fmt.Errorf("depth output tensor: %w", err)
 	}
 
-	opts, err := newOrtOptions()
+	opts, err := newOrtOptions(useDirectML, useCUDA)
 	if err != nil {
 		_ = inTensor.Destroy()
 		_ = outTensor.Destroy()
@@ -101,7 +101,7 @@ func (m *DepthModel) RunImage(img image.Image) ([]float32, error) {
 
 func preprocessDepth(img image.Image, buf []float32) {
 	dst := image.NewRGBA(image.Rect(0, 0, depthSize, depthSize))
-	draw.BiLinear.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Over, nil)
+	draw.NearestNeighbor.Scale(dst, dst.Bounds(), img, img.Bounds(), draw.Over, nil)
 
 	pix   := dst.Pix
 	plane := depthSize * depthSize

@@ -74,7 +74,7 @@ jobs:
           path: |
             model/yolov8n.onnx
             model/midas_small.onnx
-          key: onnx-models-${{ hashFiles('tools/export.py') }}-v1
+          key: onnx-models-${{ hashFiles('tools/export.py') }}-v2
 
       - name: Export YOLO model (cache miss)
         if: steps.model-cache.outputs.cache-hit != 'true'

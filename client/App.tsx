@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { View, TouchableOpacity, StyleSheet } from "react-native";
-import { Camera, useCameraDevice, useCameraPermission } from "react-native-vision-camera";
+import { Camera, useCameraDevice, useCameraPermission, useCameraFormat } from "react-native-vision-camera";
 import * as Location from "expo-location";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import { useStreamer, WS_PORT, resolveHost } from "./hooks/useStreamer";
@@ -23,6 +23,9 @@ function AppContent() {
   const cameraRef = useRef<Camera>(null);
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
+  const format = useCameraFormat(device, [
+    { videoResolution: { width: 1280, height: 720 } },
+  ]);
   const permRequestedRef = useRef(false);
   const [permAttempted, setPermAttempted] = useState(false);
   const [locationSettled, setLocationSettled] = useState(false);
@@ -120,6 +123,7 @@ function AppContent() {
           isActive={true}
           photo={true}
           audio={false}
+          format={format}
         />
       )}
       <StatsOverlay {...stats} accelMag={accelMag} fallState={fallState} topInset={insets.top} onConnect={connect} onDisconnect={disconnect} />
