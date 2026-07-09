@@ -8,7 +8,7 @@ require (
 	github.com/mdp/qrterminal/v3 v3.2.1
 	github.com/prometheus/client_golang v1.23.2
 	github.com/yalue/onnxruntime_go v1.24.0
-	golang.org/x/image v0.43.0
+	golang.org/x/image v0.44.0
 	modernc.org/sqlite v1.53.0
 )
 
