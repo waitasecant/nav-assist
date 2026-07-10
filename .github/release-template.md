@@ -14,11 +14,24 @@ Download the bundle for your OS from the assets below, unzip, and run:
 | `navassist-server-linux-amd64.zip` | Linux laptop |
 | `navassist-server-linux-arm64.zip` | Raspberry Pi 4/5 |
 
-ONNX models are downloaded automatically on first launch — no manual setup needed. The INT8-quantized model is used by default for faster inference.
+On first launch the script auto-downloads ONNX models and the GPU runtime libraries (ORT + cuDNN) into `lib/` — no manual setup needed. The INT8-quantized model is used by default for faster inference.
 
+**NVIDIA GPU:** expect two one-time downloads — cuDNN (~700 MB from PyPI) and the ORT CUDA zip (~300 MB from GitHub).
+
+```powershell
+# Windows
+.\launch.ps1
+
+# Linux
+./launch.sh
 ```
-navassist-server(.exe)
-```
+
+Optional flags:
+
+| Flag | Effect |
+|------|--------|
+| `-ForceCPU` / `--force-cpu` | Disable GPU acceleration |
+| `-ForceDirectML` *(Windows only)* | Use DirectML even on NVIDIA (skips CUDA) |
 
 To use the full-precision FP32 model instead:
 ```

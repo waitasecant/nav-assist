@@ -99,7 +99,7 @@ When MiDaS is unavailable the system falls back to bounding-box area ratio.
 │   │   ├── dashboard/                      # Embedded HTML for /dashboard
 │   │   ├── logger/logger.go                # SQLite hazard event logger
 │   │   └── metrics/metrics.go              # Prometheus counters / histograms
-│   ├── lib/                                # ORT runtime DLLs: CPU, DirectML, CUDA (downloaded by start.ps1)
+│   ├── lib/                                # ORT runtime DLLs: CPU, DirectML, CUDA + cuDNN (via start.ps1)
 │   ├── go.mod
 │   ├── .golangci.yml                       # Linter config
 │   └── start.ps1                           # One-command build + run (Windows)
@@ -129,7 +129,7 @@ When MiDaS is unavailable the system falls back to bounding-box area ratio.
 │   └── types/
 │       └── react-native-zeroconf.d.ts      # Type declarations for mDNS library
 └── tools/
-    ├── export.py                           # YOLOv8 -> ONNX export (FP32 + optional INT8 via --quantize)
+    ├── export.py                           # YOLOv8 -> ONNX export (FP32 + INT8 via --quantize)
     ├── analysis.py                         # Post-session HTML report + heatmap
     ├── smoke_test.py                       # End-to-end smoke test
     ├── setup.ps1                           # Python venv + dependency setup (Windows)
@@ -157,9 +157,9 @@ Each `v*` tag triggers a GitHub Actions release that publishes pre-built artifac
 
 | Artifact | Use |
 |----------|-----|
-| `navassist-server-linux-amd64.zip` | Laptop (Linux x64) — unzip, run binary |
-| `navassist-server-linux-arm64.zip` | Raspberry Pi 4/5 — server on the Pi, phone on Wi-Fi |
-| `navassist-server-windows-amd64.zip` | Laptop (Windows) — unzip, run binary |
+| `navassist-server-linux-amd64.zip` | Laptop (Linux x64) — unzip, run `./launch.sh` |
+| `navassist-server-linux-arm64.zip` | Raspberry Pi 4/5 — unzip, run `./launch.sh` |
+| `navassist-server-windows-amd64.zip` | Laptop (Windows) — unzip, run `launch.ps1` |
 | `navassist.apk` | Sideload directly onto phone |
 | `yolov8n.onnx`, `yolov8n_int8.onnx` | FP32 and INT8 YOLO models — auto-downloaded on first launch |
 | `midas_small.onnx` | Depth model — auto-downloaded on first launch |
@@ -170,10 +170,15 @@ Go to the [latest release](https://github.com/waitasecant/nav-assist/releases/la
 
 **Option A: Wi-Fi / mDNS**
 
-1. Unzip the server bundle and run it — models download automatically on first launch:
+1. Unzip the server bundle and run the launch script — models and GPU libraries download automatically on first launch:
    ```powershell
-   .\navassist-server.exe
+   # Windows
+   .\launch.ps1
+
+   # Linux
+   ./launch.sh
    ```
+   The script detects your GPU, downloads the right ORT and cuDNN libraries into `lib/` if needed, and starts the server with GPU acceleration automatically. To force CPU-only mode: `.\launch.ps1 -ForceCPU` / `./launch.sh --force-cpu`.
 2. On your phone, open the release page in a browser, download `navassist.apk`, and install it (enable *Install from unknown sources* when prompted).
 3. Connect phone and laptop to the **same Wi-Fi network**.
 4. Open the app — it discovers the server automatically via mDNS. Grant camera permission and start streaming.
@@ -223,7 +228,7 @@ The device stays paired; you only need to repeat `adb connect` after rebooting t
 | [ADB](https://developer.android.com/tools/releases/platform-tools) | Must be on `PATH` |
 | [Python 3.10+](https://python.org/downloads/) | For tools (model export, analysis) |
 | Wireless debugging | *Settings -> Developer Options -> Wireless debugging* (Android 11+) |
-| CUDA Toolkit 12.x *(optional)* | NVIDIA GPU only — enables CUDA EP; `start.ps1` installs cuDNN automatically |
+| CUDA Toolkit 12.x *(optional)* | NVIDIA GPU only — enables CUDA EP; `start.ps1` downloads cuDNN DLLs from PyPI wheel into `lib/` automatically |
 
 ---
 
@@ -260,7 +265,7 @@ cd server
 `start.ps1` automatically:
 - Detects GPU: NVIDIA -> CUDA EP, other GPU -> DirectML EP, none -> CPU
 - Downloads the appropriate ORT runtime DLL on first run
-- For NVIDIA: detects CUDA Toolkit and installs cuDNN via pip if missing
+- For NVIDIA: detects CUDA Toolkit and downloads cuDNN DLLs from PyPI wheel into `lib/` if missing
 - Selects INT8 model if available, falls back to FP32
 - Adds MinGW gcc to `PATH` if found at common MSYS2 paths
 - Downloads `midas_small.onnx` on first run
