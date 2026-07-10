@@ -102,17 +102,38 @@ jobs:
           mkdir -p "release/${NAME}/lib"
           cp dist/navassist-server${{ matrix.ext }} "release/${NAME}/"
           cp dist/lib/* "release/${NAME}/lib/"
-          cat > "release/${NAME}/README.txt" <<'EOF'
-          NavAssist Server — Quick Start
-          ==============================
-          1. Run navassist-server (or navassist-server.exe on Windows).
-             Models are downloaded automatically on first launch (~35 MB).
+          if [[ "${{ matrix.goos }}" == "windows" ]]; then
+            cp .github/scripts/launch.ps1 "release/${NAME}/"
+            cat > "release/${NAME}/README.txt" <<'EOF'
+          NavAssist Server — Quick Start (Windows)
+          =========================================
+          1. Run launch.ps1 (right-click → Run with PowerShell).
+             It detects your GPU, downloads the right ORT DLL if needed,
+             and starts the server with GPU acceleration automatically.
+             Models are downloaded on first launch.
+             To force CPU-only mode: powershell -File launch.ps1 -ForceCPU
           2. Install the NavAssist APK from this release on your Android phone.
           3. Both devices must be on the same Wi-Fi network.
-             The app will discover the server automatically via mDNS,
-             or scan the QR code printed in the terminal.
-          4. For USB / developer mode: leave "Server IP" blank in app settings.
+             The app discovers the server automatically via mDNS.
+             For USB: connect via adb and the app falls back to localhost automatically.
           EOF
+          else
+            cp .github/scripts/launch.sh "release/${NAME}/"
+            chmod +x "release/${NAME}/launch.sh"
+            cat > "release/${NAME}/README.txt" <<'EOF'
+          NavAssist Server — Quick Start (Linux)
+          =======================================
+          1. Run ./launch.sh
+             It detects your NVIDIA GPU, downloads the CUDA ORT lib if needed,
+             and starts the server with GPU acceleration automatically.
+             Models are downloaded on first launch.
+             To force CPU-only mode: ./launch.sh --force-cpu
+          2. Install the NavAssist APK from this release on your Android phone.
+          3. Both devices must be on the same Wi-Fi network.
+             The app discovers the server automatically via mDNS.
+             For USB: connect via adb and the app falls back to localhost automatically.
+          EOF
+          fi
           if [[ "${{ matrix.goos }}" == "windows" ]]; then
             powershell -Command "Compress-Archive -Path 'release/${NAME}' -DestinationPath '${NAME}.zip' -Force"
           else

@@ -1,7 +1,7 @@
 """
 One-time script: exports YOLOv8-nano to ONNX format and optionally quantizes to INT8.
 
-On first run, ultralytics auto-downloads yolov8n.pt (~6 MB).
+On first run, ultralytics auto-downloads yolov8n.pt.
 Produces model/yolov8n.onnx and model/yolov8n_int8.onnx at the project root.
 Run from anywhere: python tools/export.py [--quantize]
 """
@@ -25,7 +25,7 @@ MODEL_DIR.mkdir(exist_ok=True)
 if TARGET.exists():
     print(f"[✓] Already exported: {TARGET}")
 else:
-    print("[*] Loading YOLOv8-nano (downloads ~6 MB on first run)...")
+    print("[*] Loading YOLOv8-nano (downloads on first run)...")
     model = YOLO("yolov8n.pt")
 
     print("[*] Exporting to ONNX (opset 12, 320px)...")

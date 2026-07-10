@@ -53,21 +53,19 @@ foreach ($p in $cudaSearchPaths) {
     if ($cudaBinDir -and $cudnnBinDir) { break }
 }
 
-# Auto-install cuDNN via pip if CUDA is present but cuDNN is missing
+# Download cuDNN DLLs from PyPI wheel into lib/ if CUDA is present but cuDNN is missing
 if ($useNVIDIA -and $cudaBinDir -and -not $cudnnBinDir) {
-    # Check pip-installed location before attempting install
-    $cudnnPipBin = python -c "import sys,os; [print(os.path.join(p,'nvidia','cudnn','bin')) for p in sys.path if os.path.exists(os.path.join(p,'nvidia','cudnn','bin','cudnn64_9.dll'))]" 2>$null | Select-Object -First 1
-    if (-not $cudnnPipBin) {
-        Write-Host "cuDNN 9 not found - installing via pip (~500 MB, one-time)..." -ForegroundColor Green
-        pip install nvidia-cudnn-cu12 --quiet 2>$null
-        $cudnnPipBin = python -c "import sys,os; [print(os.path.join(p,'nvidia','cudnn','bin')) for p in sys.path if os.path.exists(os.path.join(p,'nvidia','cudnn','bin','cudnn64_9.dll'))]" 2>$null | Select-Object -First 1
+    if (-not (Test-Path "lib\cudnn64_9.dll")) {
+        Write-Host "Downloading cuDNN 9 from PyPI (~700 MB, one-time)..." -ForegroundColor Green
+        $meta   = Invoke-RestMethod "https://pypi.org/pypi/nvidia-cudnn-cu12/json"
+        $whlUrl = ($meta.urls | Where-Object { $_.filename -like "*win_amd64*" } | Select-Object -First 1).url
+        Invoke-WebRequest -Uri $whlUrl -OutFile "cudnn_tmp.zip"
+        Expand-Archive "cudnn_tmp.zip" -DestinationPath cudnn_tmp -Force
+        Get-ChildItem "cudnn_tmp\nvidia\cudnn\bin\*.dll" | ForEach-Object { Copy-Item $_.FullName lib\ -Force }
+        Remove-Item "cudnn_tmp.zip", cudnn_tmp -Recurse -Force
+        Write-Host "cuDNN DLLs ready in lib/." -ForegroundColor Green
     }
-    if ($cudnnPipBin -and (Test-Path "$cudnnPipBin\cudnn64_9.dll")) {
-        $cudnnBinDir = $cudnnPipBin
-        Write-Host "cuDNN ready." -ForegroundColor Green
-    } else {
-        Write-Host "cuDNN install failed - run: pip install nvidia-cudnn-cu12" -ForegroundColor Yellow
-    }
+    if (Test-Path "lib\cudnn64_9.dll") { $cudnnBinDir = (Resolve-Path "lib").Path }
 }
 
 $cudaAvailable = ($null -ne $cudaBinDir) -and ($null -ne $cudnnBinDir)
@@ -115,7 +113,7 @@ if (-not (Get-Command gcc -ErrorAction SilentlyContinue)) {
 
 # Download standard ORT DLL if missing
 if (-not (Test-Path $ORT_DLL)) {
-    Write-Host "Downloading ORT v$ORT_VERSION DLL (~8 MB)..." -ForegroundColor Green
+    Write-Host "Downloading ORT v$ORT_VERSION DLL..." -ForegroundColor Green
     New-Item -ItemType Directory -Force lib | Out-Null
     $zip = "ort_tmp.zip"
     Invoke-WebRequest -Uri $ORT_URL -OutFile $zip
@@ -128,7 +126,7 @@ if (-not (Test-Path $ORT_DLL)) {
 
 # Download CUDA ORT DLL if NVIDIA GPU detected
 if ($useNVIDIA -and -not (Test-Path $ORT_CUDA_DLL)) {
-    Write-Host "Downloading ORT CUDA v$ORT_VERSION DLL (~600 MB, one-time)..." -ForegroundColor Green
+    Write-Host "Downloading ORT CUDA v$ORT_VERSION DLL (one-time)..." -ForegroundColor Green
     New-Item -ItemType Directory -Force lib | Out-Null
     $zip = "ort_cuda_tmp.zip"
     Invoke-WebRequest -Uri $ORT_CUDA_URL -OutFile $zip
@@ -172,7 +170,7 @@ if (Test-Path $MODEL_INT8) {
 # Download MiDaS depth model if missing
 $DEPTH_MODEL = "..\model\midas_small.onnx"
 if (-not (Test-Path $DEPTH_MODEL)) {
-    Write-Host "Downloading MiDaS depth model (~80 MB)..." -ForegroundColor Green
+    Write-Host "Downloading MiDaS depth model..." -ForegroundColor Green
     Invoke-WebRequest -Uri "https://github.com/isl-org/MiDaS/releases/download/v2_1/model-small.onnx" -OutFile $DEPTH_MODEL
     Write-Host "Depth model ready." -ForegroundColor Green
 }
