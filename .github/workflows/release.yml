@@ -68,6 +68,7 @@ jobs:
           if [[ "${ARCHIVE}" == *.zip ]]; then
             unzip -q ort.archive -d /tmp/ort
             find /tmp/ort -name "onnxruntime.dll" | head -1 | xargs -I{} cp {} dist/lib/onnxruntime.dll
+            find /tmp/ort -name "onnxruntime_providers_shared.dll" | head -1 | xargs -I{} cp {} dist/lib/onnxruntime_providers_shared.dll
           else
             tar -xzf ort.archive -C /tmp/ort
             # Pick the versioned .so, skip providers libs.

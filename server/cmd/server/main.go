@@ -53,7 +53,7 @@ type config struct {
 
 func parseConfig() config {
 	var cfg config
-	flag.StringVar(&cfg.modelPath,      "model",       "../model/yolov8n.onnx",     "path to yolov8n.onnx")
+	flag.StringVar(&cfg.modelPath,      "model",       "../model/yolov8n_int8.onnx", "path to YOLO ONNX model")
 	flag.StringVar(&cfg.depthModelPath, "depth-model", "../model/midas_small.onnx", "path to MiDaS ONNX")
 	flag.StringVar(&cfg.ortLib,         "ort",         defaultOrtLib,               "path to ORT shared library")
 	flag.StringVar(&cfg.port,           "port",        "8000",                      "listen port")
