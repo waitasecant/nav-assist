@@ -178,7 +178,7 @@ Go to the [latest release](https://github.com/waitasecant/nav-assist/releases/la
    # Linux
    ./launch.sh
    ```
-   The script detects your GPU, downloads the right ORT and cuDNN libraries into `lib/` if needed, and starts the server with GPU acceleration automatically. To force CPU-only mode: `.\launch.ps1 -ForceCPU` / `./launch.sh --force-cpu`.
+   The script detects your GPU and starts with the best available backend — no extra installs required. Any GPU gets DirectML acceleration automatically. On NVIDIA, if CUDA Toolkit 12.x is already installed, CUDA EP is used instead (faster); cuDNN 9 and the ORT CUDA library are downloaded automatically on first run. To force CPU-only mode: `.\launch.ps1 -ForceCPU` / `./launch.sh --force-cpu`.
 2. On your phone, open the release page in a browser, download `navassist.apk`, and install it (enable *Install from unknown sources* when prompted).
 3. Connect phone and laptop to the **same Wi-Fi network**.
 4. Open the app — it discovers the server automatically via mDNS. Grant camera permission and start streaming.

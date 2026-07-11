@@ -1,10 +1,8 @@
 package inference
 
 import (
-	"bytes"
 	"fmt"
 	"image"
-	"image/jpeg"
 	"sync"
 
 	ort "github.com/yalue/onnxruntime_go"
@@ -75,15 +73,6 @@ func (m *DepthModel) Close() {
 	_ = m.session.Destroy()
 	_ = m.inputTensor.Destroy()
 	_ = m.outputTensor.Destroy()
-}
-
-// Run returns a normalized closeness map (0=far, 1=closest) of size depthSize×depthSize.
-func (m *DepthModel) Run(jpegBytes []byte) ([]float32, error) {
-	img, err := jpeg.Decode(bytes.NewReader(jpegBytes))
-	if err != nil {
-		return nil, err
-	}
-	return m.RunImage(img)
 }
 
 // RunImage runs depth estimation on an already-decoded image, skipping JPEG decode.

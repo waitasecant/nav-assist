@@ -10,7 +10,6 @@ import (
 	"image/jpeg"
 	"io"
 	"log/slog"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -21,7 +20,6 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/grandcat/zeroconf"
-	"github.com/mdp/qrterminal/v3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	ort "github.com/yalue/onnxruntime_go"
 
@@ -102,60 +100,6 @@ func ensureModel(dst, downloadURL string) error {
 	defer f.Close()
 	_, err = io.Copy(f, resp.Body)
 	return err
-}
-
-// localIP returns the most likely LAN IPv4 address by preferring addresses
-// that are reachable via an interface with a default gateway (i.e. not
-// link-local/APIPA 169.254.x.x and not virtual adapter ranges).
-func localIP() string {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return "localhost"
-	}
-	var fallback string
-	for _, iface := range ifaces {
-		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
-			continue
-		}
-		addrs, err := iface.Addrs()
-		if err != nil {
-			continue
-		}
-		for _, a := range addrs {
-			ipnet, ok := a.(*net.IPNet)
-			if !ok {
-				continue
-			}
-			v4 := ipnet.IP.To4()
-			if v4 == nil {
-				continue
-			}
-			// Skip link-local (APIPA) — these come from virtual/unconnected adapters.
-			if v4[0] == 169 && v4[1] == 254 {
-				continue
-			}
-			// Prefer private LAN ranges (10.x, 172.16-31.x, 192.168.x).
-			if v4[0] == 192 && v4[1] == 168 {
-				return v4.String()
-			}
-			if v4[0] == 10 {
-				return v4.String()
-			}
-			if v4[0] == 172 && v4[1] >= 16 && v4[1] <= 31 {
-				if fallback == "" {
-					fallback = v4.String()
-				}
-				continue
-			}
-			if fallback == "" {
-				fallback = v4.String()
-			}
-		}
-	}
-	if fallback != "" {
-		return fallback
-	}
-	return "localhost"
 }
 
 var upgrader = websocket.Upgrader{
@@ -320,18 +264,6 @@ func main() {
 		slog.Info("mDNS registered", "service", "_navassist._tcp.local")
 	}
 
-	// Print server URL as QR code so the phone can connect without typing an IP.
-	ip := localIP()
-	wsURL := fmt.Sprintf("navassist://%s:%s", ip, cfg.port)
-	fmt.Printf("\nScan to connect (Wi-Fi only — USB uses localhost):\n")
-	qrterminal.GenerateWithConfig(wsURL, qrterminal.Config{
-		Level:     qrterminal.L,
-		Writer:    os.Stdout,
-		BlackChar: qrterminal.BLACK,
-		WhiteChar: qrterminal.WHITE,
-	})
-	fmt.Printf("\n  %s\n\n", wsURL)
-
 	slog.Info("server listening", "addr", "0.0.0.0:"+cfg.port+"/ws")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -361,17 +293,6 @@ type responseMsg struct {
 	ServerFPS  float32               `json:"server_fps"`
 	Detections []inference.Detection `json:"detections"`
 	Commands   []commands.Command    `json:"commands"`
-}
-
-func tierIcon(tier string) string {
-	switch tier {
-	case "IMMEDIATE":
-		return "🚨"
-	case "CAUTION":
-		return "⚠️ "
-	default:
-		return "ℹ️ "
-	}
 }
 
 const (
@@ -431,7 +352,8 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 		for {
 			msgType, raw, err := conn.ReadMessage()
 			if err != nil {
-				slog.Info("client disconnected", "remote", r.RemoteAddr)
+				fmt.Println()
+				slog.Info("client disconnected", "remote", r.RemoteAddr, "frames", count)
 				break
 			}
 
@@ -551,11 +473,10 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 				if log != nil && top.Tier != "AWARE" {
 					log.LogEvent(top.Tier, top.Label, top.Depth)
 				}
-				fmt.Printf("\r%s %-9s | %-16s area: %5.1f%% | %.1f FPS | frame %04d   ",
-					tierIcon(top.Tier), top.Tier, top.Label, top.AreaRatio*100, fps, count)
+				icon := map[string]string{"IMMEDIATE": "🛑 ", "CAUTION": "⚠️ ", "AWARE": "ℹ️ "}[top.Tier]
+				fmt.Printf("\rFrame %06d | %5.2f FPS | %s %-9s %-14s", count, fps, icon, top.Tier, top.Label)
 			} else {
-				fmt.Printf("\r✅ CLEAR     |                  area:   0.0%% | %.1f FPS | frame %04d   ",
-					fps, count)
+				fmt.Printf("\rFrame %06d | %5.2f FPS | ✅ %-9s %-14s", count, fps, "CLEAR", "")
 			}
 
 			resp := responseMsg{
@@ -572,7 +493,6 @@ func makeHandler(model *inference.Model, depth *inference.DepthModel, log *logge
 				break
 			}
 		}
-		fmt.Printf("\n[-] Phone disconnected after %d frames\n", count)
 	}
 }
 

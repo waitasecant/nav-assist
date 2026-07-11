@@ -118,12 +118,7 @@ func (m *Model) Close() {
 	_ = m.outputTensor.Destroy()
 }
 
-// Run decodes a JPEG frame and returns detections sorted by area ratio descending.
-func (m *Model) Run(jpegBytes []byte) ([]Detection, error) {
-	return m.RunWithConf(jpegBytes, confThresh)
-}
-
-// RunWithConf is like Run but uses the provided confidence threshold.
+// RunWithConf is like RunImage but accepts raw JPEG bytes.
 func (m *Model) RunWithConf(jpegBytes []byte, conf float32) ([]Detection, error) {
 	img, err := jpeg.Decode(bytes.NewReader(jpegBytes))
 	if err != nil {
